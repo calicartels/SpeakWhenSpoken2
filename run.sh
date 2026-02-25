@@ -18,7 +18,8 @@ echo "Installing NeMo (--no-deps to respect pinned versions)..."
 pip install --no-deps 'nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main'
 
 echo "Installing SpeechBrain + datasets..."
-pip install speechbrain datasets
+# SpeechBrain develop: fixes torchaudio 2.9+ (list_audio_backends removed)
+pip install 'speechbrain @ git+https://github.com/speechbrain/speechbrain.git@develop' datasets
 
 mkdir -p test_audio
 
