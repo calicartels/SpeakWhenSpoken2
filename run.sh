@@ -15,7 +15,7 @@ echo "Installing NeMo (--no-deps to respect pinned versions)..."
 pip install --no-deps 'git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_toolkit[asr]'
 
 echo "Installing remaining NeMo sub-deps..."
-pip install hydra-core omegaconf pytorch-lightning torchmetrics editdistance \
+pip install hydra-core omegaconf lightning torchmetrics editdistance \
     jiwer sentencepiece transformers librosa webdataset lhotse braceexpand
 
 echo "Installing SpeechBrain + datasets..."

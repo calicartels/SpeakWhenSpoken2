@@ -22,6 +22,7 @@ wget
 wrapt
 
 # Project-specific (installed after NeMo)
+lightning>=2.0
 soundfile>=0.12
 speechbrain>=1.0
 datasets>=2.14
