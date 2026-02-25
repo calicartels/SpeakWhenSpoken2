@@ -2,6 +2,7 @@
 
 SAMPLE_RATE = 16000
 TEST_AUDIO = "test_audio/two_speakers.wav"
+HARD_AUDIO = "test_audio/hard_meeting.wav"
 
 SORTFORMER_MODEL = "nvidia/diar_streaming_sortformer_4spk-v2"
 SORTFORMER_CHUNK_LEN = 6
