@@ -38,7 +38,8 @@ def format_segments(segments):
 def format_prob_summary(probs):
     if isinstance(probs, torch.Tensor):
         probs = probs.cpu().numpy()
-    T, S = probs.shape
+    _, T, S = probs.shape
+    probs = probs[0]
     duration = T * 0.08
     lines = ["", f"Probability matrix: {T} frames x {S} speakers ({duration:.1f}s)"]
     for s in range(S):
@@ -49,11 +50,13 @@ def format_prob_summary(probs):
             lines.append(f"  spk{s}: peak={peak:.3f}, active={active_sec:.1f}s ({active_frames} frames)")
     lines.append("Sample frames (prob per speaker):")
     indices = np.linspace(0, T - 1, min(8, T), dtype=int)
-    lines.append(f"  {'time':>6}  {'spk0':>6}  {'spk1':>6}  {'spk2':>6}  {'spk3':>6}")
+    spk_hdr = "  ".join(f"{'spk'+str(j):>6}" for j in range(S))
+    lines.append(f"  {'time':>6}  {spk_hdr}")
     for i in indices:
         t = i * 0.08
         row = probs[i]
-        lines.append(f"  {t:6.2f}  {row[0]:6.3f}  {row[1]:6.3f}  {row[2]:6.3f}  {row[3]:6.3f}")
+        row_str = "  ".join(f"{row[j]:6.3f}" for j in range(S))
+        lines.append(f"  {t:6.2f}  {row_str}")
     return "\n".join(lines)
 
 
