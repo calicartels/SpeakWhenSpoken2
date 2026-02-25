@@ -11,14 +11,11 @@ echo "Installing pinned deps FIRST (prevents NeMo from overwriting)..."
 pip install Cython packaging
 pip install -r requirements.txt
 
+echo "Installing NeMo ASR dependencies..."
+pip install -r nemo_requirements.txt
+
 echo "Installing NeMo (--no-deps to respect pinned versions)..."
 pip install --no-deps 'nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main'
-
-echo "Installing remaining NeMo sub-deps..."
-pip install hydra-core omegaconf "lightning>2.2.1,<=2.4.0" torchmetrics editdistance \
-    einops jiwer sentencepiece transformers librosa webdataset lhotse braceexpand \
-    nv-one-logger-core nv-one-logger-training-telemetry \
-    nv-one-logger-pytorch-lightning-integration
 
 echo "Installing SpeechBrain + datasets..."
 pip install speechbrain datasets
