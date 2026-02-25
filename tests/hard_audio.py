@@ -34,6 +34,8 @@ def load_speakers(n=3):
         if spk in speaker_ids:
             speaker_audio[spk].append(audio)
 
+        if len(speaker_ids) < n:
+            continue
         all_long = all(
             sum(len(a) for a in speaker_audio[s]) > 30 * config.SAMPLE_RATE
             for s in speaker_ids
