@@ -18,26 +18,38 @@ def load_speakers(n=3):
         split="test",
         streaming=True,
     )
-    speakers = []
-    seen = set()
+    speaker_audio = {}
+    speaker_ids = []
+
     for item in ds:
         spk = item["speaker_id"]
-        if spk in seen:
-            continue
         audio = np.array(item["audio"]["array"], dtype=np.float32)
-        if len(audio) < 6 * config.SAMPLE_RATE:
-            continue
-        seen.add(spk)
-        speakers.append(audio)
-        if len(speakers) >= n:
+
+        if spk not in speaker_audio:
+            if len(speaker_ids) >= n:
+                continue
+            speaker_audio[spk] = []
+            speaker_ids.append(spk)
+
+        if spk in speaker_ids:
+            speaker_audio[spk].append(audio)
+
+        all_long = all(
+            sum(len(a) for a in speaker_audio[s]) > 30 * config.SAMPLE_RATE
+            for s in speaker_ids
+        )
+        if all_long:
             break
+
+    speakers = []
+    for spk in speaker_ids:
+        combined = np.concatenate(speaker_audio[spk])
+        speakers.append(combined)
     return speakers
 
 
-def place(mix, audio, start_sec, dur_sec, sr):
+def place(mix, chunk, start_sec, sr):
     s = int(start_sec * sr)
-    n = int(dur_sec * sr)
-    chunk = audio[:n]
     end = s + len(chunk)
     if end > len(mix):
         chunk = chunk[: len(mix) - s]
@@ -47,25 +59,57 @@ def place(mix, audio, start_sec, dur_sec, sr):
 
 def build_hard_meeting(speakers):
     sr = config.SAMPLE_RATE
+    for i, spk in enumerate(speakers):
+        assert len(spk) >= 20 * sr, f"spk{i} too short: {len(spk)/sr:.1f}s"
+
     total_sec = 35
     mix = np.zeros(total_sec * sr, dtype=np.float32)
     a, b, c = speakers[0], speakers[1], speakers[2]
+    a_off, b_off, c_off = 0, 0, 0
 
-    place(mix, a[0:], 0.0, 3.0, sr)
-    place(mix, b[0:], 3.0, 3.0, sr)
-    place(mix, a[3 * sr :], 6.0, 2.0, sr)
-    place(mix, b[3 * sr :], 6.0, 2.0, sr)
-    place(mix, a[5 * sr :], 9.0, 1.5, sr)
-    place(mix, b[5 * sr :], 10.5, 1.5, sr)
-    place(mix, a[int(6.5 * sr) :], 12.0, 1.5, sr)
-    place(mix, b[int(6.5 * sr) :], 13.5, 1.5, sr)
-    place(mix, c[0:], 16.0, 4.0, sr)
-    place(mix, a[8 * sr :], 20.0, 3.0, sr)
-    place(mix, a[11 * sr :], 23.0, 2.5, sr)
-    place(mix, b[8 * sr :], 23.0, 2.5, sr)
-    place(mix, c[4 * sr :], 23.0, 2.5, sr)
-    place(mix, c[int(6.5 * sr) :], 25.5, 2.5, sr)
-    place(mix, b[int(10.5 * sr) :], 28.0, 2.0, sr)
+    def take(src, offset, dur):
+        n = int(dur * sr)
+        chunk = src[offset : offset + n]
+        return chunk, offset + n
+
+    chunk, a_off = take(a, a_off, 3.0)
+    place(mix, chunk, 0.0, sr)
+
+    chunk, b_off = take(b, b_off, 3.0)
+    place(mix, chunk, 3.0, sr)
+
+    chunk, a_off = take(a, a_off, 2.0)
+    place(mix, chunk, 6.0, sr)
+    chunk, b_off = take(b, b_off, 2.0)
+    place(mix, chunk, 6.0, sr)
+
+    chunk, a_off = take(a, a_off, 1.5)
+    place(mix, chunk, 9.0, sr)
+    chunk, b_off = take(b, b_off, 1.5)
+    place(mix, chunk, 10.5, sr)
+    chunk, a_off = take(a, a_off, 1.5)
+    place(mix, chunk, 12.0, sr)
+    chunk, b_off = take(b, b_off, 1.5)
+    place(mix, chunk, 13.5, sr)
+
+    chunk, c_off = take(c, c_off, 4.0)
+    place(mix, chunk, 16.0, sr)
+
+    chunk, a_off = take(a, a_off, 3.0)
+    place(mix, chunk, 20.0, sr)
+
+    chunk, a_off = take(a, a_off, 2.5)
+    place(mix, chunk, 23.0, sr)
+    chunk, b_off = take(b, b_off, 2.5)
+    place(mix, chunk, 23.0, sr)
+    chunk, c_off = take(c, c_off, 2.5)
+    place(mix, chunk, 23.0, sr)
+
+    chunk, c_off = take(c, c_off, 2.5)
+    place(mix, chunk, 25.5, sr)
+
+    chunk, b_off = take(b, b_off, 2.0)
+    place(mix, chunk, 28.0, sr)
 
     mix = mix / (np.abs(mix).max() + 1e-8) * 0.9
 
@@ -89,6 +133,28 @@ def build_hard_meeting(speakers):
     return mix, ground_truth
 
 
+def save_clean_sources(speakers):
+    os.makedirs(config.CLEAN_DIR, exist_ok=True)
+    sr = config.SAMPLE_RATE
+    clean_segments = [
+        ("spk0_early", 0, 0.0, 3.0),
+        ("spk0_rapid", 0, 5.0, 6.5),
+        ("spk0_return", 0, 8.0, 11.0),
+        ("spk1_early", 1, 0.0, 3.0),
+        ("spk1_rapid", 1, 5.0, 6.5),
+        ("spk1_close", 1, 10.5, 12.5),
+        ("spk2_solo", 2, 0.0, 4.0),
+        ("spk2_late", 2, 6.5, 9.0),
+    ]
+    for name, spk_idx, start, end in clean_segments:
+        src = speakers[spk_idx]
+        s = int(start * sr)
+        e = int(end * sr)
+        chunk = src[s:e]
+        path = os.path.join(config.CLEAN_DIR, f"{name}.wav")
+        torchaudio.save(path, torch.tensor(chunk).unsqueeze(0), sr)
+
+
 def format_gt(ground_truth):
     lines = [f"{'TIME':>12}  {'SPEAKERS':>12}  DESCRIPTION", "-" * 50]
     for start, end, spks, desc in ground_truth:
@@ -102,6 +168,7 @@ speakers = load_speakers(n=3)
 mix, gt = build_hard_meeting(speakers)
 wav = torch.tensor(mix).unsqueeze(0)
 torchaudio.save(config.HARD_AUDIO, wav, config.SAMPLE_RATE)
+save_clean_sources(speakers)
 duration = len(mix) / config.SAMPLE_RATE
 print(f"{config.HARD_AUDIO} ({duration:.1f}s)")
 print(format_gt(gt))
