@@ -70,3 +70,4 @@ torchaudio.save(config.TEST_AUDIO, wav, config.SAMPLE_RATE)
 duration = len(mixed) / config.SAMPLE_RATE
 print(f"{config.TEST_AUDIO} ({duration:.1f}s)")
 print(format_timeline(timeline))
+os._exit(0)
