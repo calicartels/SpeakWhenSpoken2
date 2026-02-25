@@ -16,7 +16,8 @@ pip install --no-deps 'git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_tool
 
 echo "Installing remaining NeMo sub-deps..."
 pip install hydra-core omegaconf lightning torchmetrics editdistance \
-    jiwer sentencepiece transformers librosa webdataset lhotse braceexpand
+    jiwer sentencepiece transformers librosa webdataset lhotse braceexpand \
+    nv-one-logger-training-telemetry
 
 echo "Installing SpeechBrain + datasets..."
 pip install speechbrain datasets
