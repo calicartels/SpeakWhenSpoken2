@@ -15,7 +15,7 @@ echo "Installing NeMo (--no-deps to respect pinned versions)..."
 pip install --no-deps 'git+https://github.com/NVIDIA/NeMo.git@main#egg=nemo_toolkit[asr]'
 
 echo "Installing remaining NeMo sub-deps..."
-pip install hydra-core omegaconf lightning torchmetrics editdistance \
+pip install hydra-core omegaconf "lightning>2.2.1,<=2.4.0" torchmetrics editdistance \
     jiwer sentencepiece transformers librosa webdataset lhotse braceexpand \
     nv-one-logger-core nv-one-logger-training-telemetry \
     nv-one-logger-pytorch-lightning-integration
