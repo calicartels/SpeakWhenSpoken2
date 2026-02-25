@@ -25,3 +25,4 @@ wrapt
 lightning>2.2.1,<=2.4.0
 soundfile>=0.12
 datasets>=2.14
+torchcodec

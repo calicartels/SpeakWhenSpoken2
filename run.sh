@@ -11,6 +11,7 @@ pip install Cython packaging
 pip install -r requirements.txt
 pip install -r nemo_requirements.txt
 pip install --no-deps 'nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@main'
+pip install torchcodec
 pip install 'speechbrain @ git+https://github.com/speechbrain/speechbrain.git@develop' datasets
 mkdir -p test_audio
 

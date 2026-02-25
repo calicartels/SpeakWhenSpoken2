@@ -13,7 +13,6 @@ def load_librispeech_samples(n=4):
         "librispeech_asr", "clean",
         split="test",
         streaming=True,
-        trust_remote_code=True,
     )
     samples = []
     seen_speakers = set()
