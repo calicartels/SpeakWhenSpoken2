@@ -11,7 +11,7 @@ PRINT_EVERY_N = 40
 FRAME_SEC = 0.08
 
 
-def process_file(audio, sample_rate, probs_sequence, vap_model=None):
+def process_file(audio, sample_rate, probs_sequence, vap_model):
     frame_samples = int(FRAME_SEC * sample_rate)
     n_frames = len(probs_sequence)
     n_speakers = len(probs_sequence[0]) if n_frames > 0 else 4
@@ -22,8 +22,6 @@ def process_file(audio, sample_rate, probs_sequence, vap_model=None):
     frame_log = []
 
     print(f"Processing {n_frames} frames ({n_frames * FRAME_SEC:.1f}s)")
-    if vap_model is None:
-        print("VAP: energy fallback (install maai for real predictions)")
 
     for i in range(n_frames):
         ts = i * FRAME_SEC
