@@ -1,23 +1,8 @@
-import json
-import time
-import resource
-
 import torch
 import numpy as np
 from nemo.collections.asr.models import SortformerEncLabelModel
 
 import config
-
-# #region agent log
-_DBG_LOG = "/tmp/debug-e28f32.log"
-def _dbg_sf(msg, hyp, **data):
-    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
-    gpu_mb = torch.cuda.memory_allocated() / 1e6 if torch.cuda.is_available() else 0
-    gpu_reserved_mb = torch.cuda.memory_reserved() / 1e6 if torch.cuda.is_available() else 0
-    entry = {"sessionId": "e28f32", "timestamp": int(time.time() * 1000), "location": "sortformer.py", "message": msg, "hypothesisId": hyp, "data": {**data, "rss_mb": round(rss_mb, 1), "gpu_mb": round(gpu_mb, 1), "gpu_reserved_mb": round(gpu_reserved_mb, 1)}}
-    with open(_DBG_LOG, "a") as f:
-        f.write(json.dumps(entry) + "\n")
-# #endregion
 
 
 def load_model():
@@ -42,28 +27,11 @@ def diarize(model, audio_path):
 
 
 def get_frame_probs(model, audio_path, n_speakers=4):
-    # #region agent log
-    _dbg_sf("before_diarize", "H2,H3")
-    # #endregion
     segments, probs = diarize(model, audio_path)
-    # #region agent log
-    _dbg_sf("after_diarize", "H2,H3", probs_shape=list(probs.shape), probs_dtype=str(probs.dtype), probs_device=str(probs.device))
-    # #endregion
     arr = probs.cpu().numpy()
     if arr.ndim == 3:
         arr = arr[0]
-    # #region agent log
-    _dbg_sf("after_probs_cpu_numpy", "H2,H5", arr_shape=list(arr.shape), arr_mb=round(arr.nbytes / 1e6, 2))
-    # #endregion
-    del probs
-    del segments
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
     out = [list(arr[t]) for t in range(arr.shape[0])]
-    # #region agent log
-    _dbg_sf("after_list_creation", "H5", n_frames=len(out))
-    # #endregion
-    del arr
     while len(out[0]) < n_speakers:
         for row in out:
             row.append(0.0)
