@@ -32,7 +32,6 @@ def transcribe(model, processor, audio_path):
 
 
 def transcribe_chunk(model, processor, chunk, sr):
-    """chunk: numpy array, sr: sample rate. Skips segments < 0.3s."""
     if len(chunk) < sr * 0.3:
         return ""
     inputs = processor(chunk, sampling_rate=sr, return_tensors="pt")

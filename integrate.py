@@ -1,5 +1,3 @@
-# integrate.py — Sortformer + ECAPA + Voxtral → speaker-attributed transcript
-
 import torch
 import torchaudio
 
@@ -7,6 +5,10 @@ import config
 from ecapa import load_model as load_ecapa
 from sortformer import diarize, load_model as load_sortformer
 from voxtral import load_model as load_voxtral, transcribe_chunk
+from identity import (
+    load_address_book, new_session, update_slot,
+    resolve_identities, get_identity, commit_session,
+)
 
 
 def parse_segments(raw_segments):
@@ -32,33 +34,22 @@ def extract_embedding(ecapa, wav, start_sec, end_sec, sr):
     return emb
 
 
-def cosine(a, b):
-    return torch.dot(a, b) / (a.norm() * b.norm() + 1e-8)
+def build_identities(segments, embeddings, book):
+    session = new_session()
 
-
-def assign_identities(segments, embeddings, threshold=0.45):
-    identities = {}
-    segment_ids = {}
-    next_id = 0
-    for i, emb in enumerate(embeddings):
+    for i, (seg, emb) in enumerate(zip(segments, embeddings)):
         if emb is None:
-            segment_ids[i] = "unknown"
             continue
-        matched = False
-        for identity_id, stored_embs in identities.items():
-            avg_emb = torch.stack(stored_embs).mean(dim=0)
-            sim = cosine(emb, avg_emb).item()
-            if sim > threshold:
-                identities[identity_id].append(emb)
-                segment_ids[i] = identity_id
-                matched = True
-                break
-        if not matched:
-            identity_id = f"person_{next_id}"
-            identities[identity_id] = [emb]
-            segment_ids[i] = identity_id
-            next_id += 1
-    return segment_ids
+        duration = seg["end"] - seg["start"]
+        update_slot(session, seg["speaker"], emb, duration)
+
+    resolve_identities(session, book)
+
+    segment_ids = {}
+    for i, seg in enumerate(segments):
+        segment_ids[i] = get_identity(session, seg["speaker"])
+
+    return segment_ids, session
 
 
 def format_output(segments, identities, transcripts):
@@ -70,6 +61,14 @@ def format_output(segments, identities, transcripts):
             continue
         lines.append(f"\n[{seg['start']:6.2f}s - {seg['end']:6.2f}s] {identity} ({seg['speaker']})")
         lines.append(f"  \"{text}\"")
+    return "\n".join(lines)
+
+
+def format_session_summary(session):
+    lines = ["\nSESSION IDENTITY SUMMARY", "-" * 40]
+    for slot_id, slot in session["slots"].items():
+        name = slot["identity"] or "(unresolved)"
+        lines.append(f"  {slot_id} -> {name} ({slot['total_sec']:.1f}s accumulated)")
     return "\n".join(lines)
 
 
@@ -94,7 +93,10 @@ embeddings = []
 for seg in segments:
     emb = extract_embedding(ecapa, wav, seg["start"], seg["end"], sr)
     embeddings.append(emb)
-identities = assign_identities(segments, embeddings)
+
+book = load_address_book()
+identities, session = build_identities(segments, embeddings, book)
+commit_session(session, book)
 
 transcripts = []
 for seg in segments:
@@ -105,4 +107,5 @@ for seg in segments:
     transcripts.append(text)
 
 print(format_output(segments, identities, transcripts))
+print(format_session_summary(session))
 print(f"\n{len(segments)} segments, {len(set(identities.values()))} speakers, {duration:.1f}s")

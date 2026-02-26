@@ -1,5 +1,3 @@
-# ecapa.py — extract speaker embeddings, show cosine similarity matrix
-
 import torch
 import torchaudio
 import numpy as np
