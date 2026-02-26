@@ -1,6 +1,9 @@
 SAMPLE_RATE = 16000
 TEST_AUDIO = "test_audio/two_speakers.wav"
 HARD_AUDIO = "test_audio/hard_meeting.wav"
+TEST_AUDIO_ASSET = "assets/Test_audio_20min.wav"
+TEST_AUDIO_2MIN = "assets/Test_audio_2min.wav"
+TEST_AUDIO_20MIN = "assets/Test_audio_20min.wav"
 CLEAN_DIR = "test_audio/clean_sources"
 
 SORTFORMER_MODEL = "nvidia/diar_streaming_sortformer_4spk-v2"

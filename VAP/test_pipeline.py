@@ -97,30 +97,58 @@ def run_mock(duration_sec=20.0, scenario="four_speakers"):
     return meeting, log
 
 
-def run_real(audio_path=None):
-    import torch
-    import torchaudio
-
+def run_real(audio_path=None, max_sec=None):
     import config
-    from sortformer import load_model, get_frame_probs
 
     if audio_path is None:
-        audio_path = config.HARD_AUDIO
+        audio_path = getattr(config, "TEST_AUDIO_ASSET", None) or config.HARD_AUDIO
     if not os.path.exists(audio_path):
         print(f"Audio not found: {audio_path}")
         return None, None
 
-    wav, sr = torchaudio.load(audio_path)
-    wav = wav.squeeze(0)
-    if wav.dim() == 0:
-        wav = wav.unsqueeze(0)
-    if sr != config.SAMPLE_RATE:
-        wav = torchaudio.functional.resample(wav, sr, config.SAMPLE_RATE)
-        sr = config.SAMPLE_RATE
-    audio = wav.numpy().astype(np.float32)
+    try:
+        import torchaudio
+        wav, sr = torchaudio.load(audio_path)
+        wav = wav.squeeze(0)
+        if wav.dim() == 0:
+            wav = wav.unsqueeze(0)
+        if sr != config.SAMPLE_RATE:
+            import torch
+            wav = torchaudio.functional.resample(wav, sr, config.SAMPLE_RATE)
+            sr = config.SAMPLE_RATE
+        audio = wav.numpy().astype(np.float32)
+    except Exception as e:
+        import soundfile as sf
+        data, sr = sf.read(audio_path, dtype="float32")
+        if data.ndim > 1:
+            data = data.mean(axis=1)
+        if sr != config.SAMPLE_RATE:
+            from scipy.signal import resample
+            n = int(len(data) * config.SAMPLE_RATE / sr)
+            data = resample(data, n)
+            sr = config.SAMPLE_RATE
+        audio = data.astype(np.float32)
 
-    model = load_model()
-    probs_list = get_frame_probs(model, audio_path)
+    if max_sec:
+        n_samples = int(max_sec * config.SAMPLE_RATE)
+        audio = audio[:n_samples]
+        import tempfile
+        import soundfile as sf
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            sf.write(f.name, audio, config.SAMPLE_RATE)
+            sortformer_path = f.name
+        try:
+            from sortformer import load_model, get_frame_probs
+            model = load_model()
+            probs_list = get_frame_probs(model, sortformer_path)
+        finally:
+            os.unlink(sortformer_path)
+        print(f"Truncated to first {max_sec}s")
+    else:
+        from sortformer import load_model, get_frame_probs
+        model = load_model()
+        probs_list = get_frame_probs(model, audio_path)
+    sr = config.SAMPLE_RATE
     vap_model = vap.load_vap()
     return orchestrate.process_file(audio, sr, probs_list, vap_model)
 
@@ -128,12 +156,13 @@ def run_real(audio_path=None):
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--real", action="store_true", help="Use real Sortformer on config.HARD_AUDIO")
+    ap.add_argument("--real", action="store_true", help="Use real Sortformer")
     ap.add_argument("--audio", type=str, default=None, help="Audio path for --real")
+    ap.add_argument("--max-sec", type=float, default=None, help="Process only first N seconds")
     args = ap.parse_args()
 
     if args.real:
-        run_real(args.audio)
+        run_real(args.audio, args.max_sec)
     else:
         run_mock(20.0, "four_speakers")
         print("\n\n")
