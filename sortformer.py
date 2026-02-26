@@ -50,6 +50,8 @@ def get_frame_probs(model, audio_path, n_speakers=4):
     _dbg_sf("after_diarize", "H2,H3", probs_shape=list(probs.shape), probs_dtype=str(probs.dtype), probs_device=str(probs.device))
     # #endregion
     arr = probs.cpu().numpy()
+    if arr.ndim == 3:
+        arr = arr[0]
     # #region agent log
     _dbg_sf("after_probs_cpu_numpy", "H2,H5", arr_shape=list(arr.shape), arr_mb=round(arr.nbytes / 1e6, 2))
     # #endregion
