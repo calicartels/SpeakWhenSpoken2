@@ -9,7 +9,7 @@ from nemo.collections.asr.models import SortformerEncLabelModel
 import config
 
 # #region agent log
-_DBG_LOG = "/Users/vishnumukundan/Documents/Duke Code/SS2/.cursor/debug-e28f32.log"
+_DBG_LOG = "/tmp/debug-e28f32.log"
 def _dbg_sf(msg, hyp, **data):
     rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
     gpu_mb = torch.cuda.memory_allocated() / 1e6 if torch.cuda.is_available() else 0

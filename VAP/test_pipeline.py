@@ -12,7 +12,7 @@ from VAP import orchestrate
 from VAP import vap
 
 # #region agent log
-_DBG_LOG = "/Users/vishnumukundan/Documents/Duke Code/SS2/.cursor/debug-e28f32.log"
+_DBG_LOG = "/tmp/debug-e28f32.log"
 def _dbg(msg, hyp, **data):
     rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
     try:

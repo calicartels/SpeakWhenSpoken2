@@ -15,7 +15,7 @@ PRINT_EVERY_N = 40
 FRAME_SEC = 0.08
 
 # #region agent log
-_DBG_LOG = "/Users/vishnumukundan/Documents/Duke Code/SS2/.cursor/debug-e28f32.log"
+_DBG_LOG = "/tmp/debug-e28f32.log"
 def _dbg_orch(msg, hyp, **data):
     rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
     entry = {"sessionId": "e28f32", "timestamp": int(time.time() * 1000), "location": "orchestrate.py", "message": msg, "hypothesisId": hyp, "data": {**data, "rss_mb": round(rss_mb, 1)}}
