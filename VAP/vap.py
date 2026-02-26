@@ -2,8 +2,10 @@ import numpy as np
 
 try:
     from maai import Maai, MaaiInput
+    if not hasattr(MaaiInput, "File"):
+        raise ImportError("MaaiInput.File not available in this maai version")
     HAS_MAAI = True
-except ImportError:
+except (ImportError, AttributeError):
     HAS_MAAI = False
 
 MAAI_FRAME_RATE = 10
