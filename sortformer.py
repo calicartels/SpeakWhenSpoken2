@@ -26,6 +26,16 @@ def diarize(model, audio_path):
     return segments[0], probs[0]
 
 
+def get_frame_probs(model, audio_path, n_speakers=4):
+    segments, probs = diarize(model, audio_path)
+    arr = probs.cpu().numpy()
+    out = [list(arr[t]) for t in range(arr.shape[0])]
+    while len(out[0]) < n_speakers:
+        for row in out:
+            row.append(0.0)
+    return out
+
+
 def format_segments(segments):
     lines = [f"{'START':>8}  {'END':>8}  SPEAKER", "-" * 30]
     for seg in segments:
