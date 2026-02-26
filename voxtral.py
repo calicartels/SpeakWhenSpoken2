@@ -31,11 +31,20 @@ def transcribe(model, processor, audio_path):
     return text
 
 
-model, processor = load_model()
+def transcribe_chunk(model, processor, chunk, sr):
+    """chunk: numpy array, sr: sample rate. Skips segments < 0.3s."""
+    if len(chunk) < sr * 0.3:
+        return ""
+    inputs = processor(chunk, sampling_rate=sr, return_tensors="pt")
+    inputs = inputs.to(model.device, dtype=model.dtype)
+    with torch.no_grad():
+        outputs = model.generate(**inputs)
+    text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
+    return text.strip()
 
-text = transcribe(model, processor, config.TEST_AUDIO)
-print(text)
 
-if os.path.exists(config.HARD_AUDIO):
-    text_hard = transcribe(model, processor, config.HARD_AUDIO)
-    print(text_hard)
+if __name__ == "__main__":
+    model, processor = load_model()
+    print(transcribe(model, processor, config.TEST_AUDIO))
+    if os.path.exists(config.HARD_AUDIO):
+        print(transcribe(model, processor, config.HARD_AUDIO))

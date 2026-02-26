@@ -60,7 +60,8 @@ def format_prob_summary(probs):
     return "\n".join(lines)
 
 
-model = load_model()
-segments, probs = diarize(model, config.TEST_AUDIO)
-print(format_segments(segments))
-print(format_prob_summary(probs))
+if __name__ == "__main__":
+    model = load_model()
+    segments, probs = diarize(model, config.TEST_AUDIO)
+    print(format_segments(segments))
+    print(format_prob_summary(probs))

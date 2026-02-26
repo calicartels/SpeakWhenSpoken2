@@ -73,21 +73,21 @@ def format_similarity(chunks, sim):
     return "\n".join(lines)
 
 
-model = load_model()
-wav = load_audio(config.TEST_AUDIO)
-duration = len(wav) / config.SAMPLE_RATE
-segments = [
-    (0.0, 4.0, "spk0"),
-    (4.5, 9.0, "spk1"),
-    (10.0, 14.0, "spk2"),
-]
-segments = [(s, min(e, duration), l) for s, e, l in segments if s < duration]
-chunks = segment_audio(wav, segments)
-embs = extract_embeddings(model, chunks)
-
-if len(embs) == 0:
-    print("No valid segments. Check segment times vs audio duration.")
-else:
-    sim = cosine_sim(embs)
-    print(format_similarity(chunks, sim))
-    torch.save({"embeddings": embs, "chunks": chunks}, "test_audio/ecapa_embeddings.pt")
+if __name__ == "__main__":
+    model = load_model()
+    wav = load_audio(config.TEST_AUDIO)
+    duration = len(wav) / config.SAMPLE_RATE
+    segments = [
+        (0.0, 4.0, "spk0"),
+        (4.5, 9.0, "spk1"),
+        (10.0, 14.0, "spk2"),
+    ]
+    segments = [(s, min(e, duration), l) for s, e, l in segments if s < duration]
+    chunks = segment_audio(wav, segments)
+    embs = extract_embeddings(model, chunks)
+    if len(embs) == 0:
+        print("No valid segments. Check segment times vs audio duration.")
+    else:
+        sim = cosine_sim(embs)
+        print(format_similarity(chunks, sim))
+        torch.save({"embeddings": embs, "chunks": chunks}, "test_audio/ecapa_embeddings.pt")
