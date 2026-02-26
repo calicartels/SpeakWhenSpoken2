@@ -1,5 +1,8 @@
 import os
 import sys
+import json
+import time
+import resource
 
 import numpy as np
 
@@ -7,6 +10,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from VAP import orchestrate
 from VAP import vap
+
+# #region agent log
+_DBG_LOG = "/Users/vishnumukundan/Documents/Duke Code/SS2/.cursor/debug-e28f32.log"
+def _dbg(msg, hyp, **data):
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+    try:
+        import torch
+        gpu_mb = torch.cuda.memory_allocated() / 1e6 if torch.cuda.is_available() else 0
+        gpu_reserved_mb = torch.cuda.memory_reserved() / 1e6 if torch.cuda.is_available() else 0
+    except Exception:
+        gpu_mb, gpu_reserved_mb = 0, 0
+    entry = {"sessionId": "e28f32", "timestamp": int(time.time() * 1000), "location": "test_pipeline.py", "message": msg, "hypothesisId": hyp, "data": {**data, "rss_mb": round(rss_mb, 1), "gpu_mb": round(gpu_mb, 1), "gpu_reserved_mb": round(gpu_reserved_mb, 1)}}
+    with open(_DBG_LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+# #endregion
 
 
 def mock_probs(duration_sec, scenario="two_speakers"):
@@ -100,6 +118,10 @@ def run_mock(duration_sec=20.0, scenario="four_speakers"):
 def run_real(audio_path=None, max_sec=None):
     import config
 
+    # #region agent log
+    _dbg("run_real_start", "H1")
+    # #endregion
+
     if audio_path is None:
         audio_path = getattr(config, "TEST_AUDIO_ASSET", None) or config.HARD_AUDIO
     if not os.path.exists(audio_path):
@@ -129,6 +151,10 @@ def run_real(audio_path=None, max_sec=None):
             sr = config.SAMPLE_RATE
         audio = data.astype(np.float32)
 
+    # #region agent log
+    _dbg("audio_loaded", "H1", audio_len=len(audio), audio_mb=round(audio.nbytes / 1e6, 1))
+    # #endregion
+
     if max_sec:
         n_samples = int(max_sec * config.SAMPLE_RATE)
         audio = audio[:n_samples]
@@ -146,11 +172,47 @@ def run_real(audio_path=None, max_sec=None):
         print(f"Truncated to first {max_sec}s")
     else:
         from sortformer import load_model, get_frame_probs
+        # #region agent log
+        _dbg("before_model_load", "H1")
+        # #endregion
         model = load_model()
+        # #region agent log
+        _dbg("after_model_load", "H1")
+        # #endregion
         probs_list = get_frame_probs(model, audio_path)
+        # #region agent log
+        _dbg("after_get_frame_probs", "H1,H2,H3,H5", n_frames=len(probs_list), probs_sample=probs_list[0] if probs_list else None)
+        # #endregion
+
+    # #region agent log
+    _dbg("before_del_model", "H1,H3", model_type=type(model).__name__)
+    # #endregion
+
+    del model
+    import torch
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    import gc
+    gc.collect()
+
+    # #region agent log
+    _dbg("after_del_model", "H1,H3")
+    # #endregion
+
     sr = config.SAMPLE_RATE
     vap_model = vap.load_vap()
-    return orchestrate.process_file(audio, sr, probs_list, vap_model)
+
+    # #region agent log
+    _dbg("before_orchestrate", "H1,H4")
+    # #endregion
+
+    result = orchestrate.process_file(audio, sr, probs_list, vap_model)
+
+    # #region agent log
+    _dbg("after_orchestrate", "H4")
+    # #endregion
+
+    return result
 
 
 if __name__ == "__main__":

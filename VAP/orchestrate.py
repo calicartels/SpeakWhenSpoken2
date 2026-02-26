@@ -1,3 +1,7 @@
+import json
+import time
+import resource
+
 import numpy as np
 
 from VAP import dyad
@@ -9,6 +13,15 @@ from VAP import vap
 VAP_EVERY_N = 4
 PRINT_EVERY_N = 40
 FRAME_SEC = 0.08
+
+# #region agent log
+_DBG_LOG = "/Users/vishnumukundan/Documents/Duke Code/SS2/.cursor/debug-e28f32.log"
+def _dbg_orch(msg, hyp, **data):
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+    entry = {"sessionId": "e28f32", "timestamp": int(time.time() * 1000), "location": "orchestrate.py", "message": msg, "hypothesisId": hyp, "data": {**data, "rss_mb": round(rss_mb, 1)}}
+    with open(_DBG_LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+# #endregion
 
 
 def process_file(audio, sample_rate, probs_sequence, vap_model=None):
@@ -24,6 +37,10 @@ def process_file(audio, sample_rate, probs_sequence, vap_model=None):
     print(f"Processing {n_frames} frames ({n_frames * FRAME_SEC:.1f}s)")
     if vap_model is None:
         print("VAP: energy fallback (install maai for real predictions)")
+
+    # #region agent log
+    _dbg_orch("orchestrate_loop_start", "H4", n_frames=n_frames)
+    # #endregion
 
     for i in range(n_frames):
         ts = i * FRAME_SEC
@@ -62,6 +79,11 @@ def process_file(audio, sample_rate, probs_sequence, vap_model=None):
 
         if i > 0 and i % PRINT_EVERY_N == 0:
             print(_format_frame_status(meeting, dyad_out))
+
+        # #region agent log
+        if i > 0 and i % 2000 == 0:
+            _dbg_orch(f"orchestrate_frame_{i}", "H4", frame=i, log_entries=len(frame_log))
+        # #endregion
 
         prev_dyad = dyad_out
 
