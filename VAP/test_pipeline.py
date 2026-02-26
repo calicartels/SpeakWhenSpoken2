@@ -181,7 +181,7 @@ def run_real(audio_path=None, max_sec=None):
         # #endregion
         probs_list = get_frame_probs(model, audio_path)
         # #region agent log
-        _dbg("after_get_frame_probs", "H1,H2,H3,H5", n_frames=len(probs_list), probs_sample=probs_list[0] if probs_list else None)
+        _dbg("after_get_frame_probs", "H1,H2,H3,H5", n_frames=len(probs_list), probs_sample=[float(x) for x in probs_list[0]] if probs_list else None)
         # #endregion
 
     # #region agent log
