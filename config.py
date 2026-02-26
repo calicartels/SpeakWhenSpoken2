@@ -15,5 +15,7 @@ SORTFORMER_CACHE_LEN = 188
 ECAPA_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 ECAPA_EMB_DIM = 192
 
+VOXTRAL_MODEL = "mistralai/Voxtral-Mini-4B-Realtime-2602"
+
 MIN_SEGMENT_SEC = 1.5
 MAX_SEGMENT_SEC = 10.0

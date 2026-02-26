@@ -17,4 +17,11 @@ python tests/hard_diar.py
 python tests/hard_identity.py
 ```
 
-audio_test: LibriSpeech → test wav. Sortformer: diarization (80ms, 4 spk). ECAPA: embeddings (192-dim).
+Voxtral (optional, transformers v5 may conflict with NeMo):
+
+```bash
+bash setup_voxtral.sh
+python voxtral.py
+```
+
+audio_test: LibriSpeech → test wav. Sortformer: diarization (80ms, 4 spk). ECAPA: embeddings (192-dim). Voxtral: streaming ASR.
