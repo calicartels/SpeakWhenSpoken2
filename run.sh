@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 
-apt-get update && apt-get install -y libsndfile1 ffmpeg sox
+apt-get update && apt-get install -y libsndfile1 ffmpeg sox portaudio19-dev
 pip install Cython packaging
 pip install -r requirements.txt
 pip install -r nemo_requirements.txt

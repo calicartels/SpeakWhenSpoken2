@@ -24,4 +24,11 @@ bash setup_voxtral.sh
 python voxtral.py
 ```
 
+MaAI (VAP turn-taking, optional; falls back to energy heuristic if missing):
+
+```bash
+apt install -y portaudio19-dev   # Linux: required for PyAudio
+pip install maai
+```
+
 audio_test: LibriSpeech → test wav. Sortformer: diarization (80ms, 4 spk). ECAPA: embeddings (192-dim). Voxtral: streaming ASR.
