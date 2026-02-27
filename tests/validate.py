@@ -54,8 +54,8 @@ def run():
     print(f"\n{memory.render_for_llm(store)}")
 
     # Phase 1.3: LLM decisions
-    if not os.environ.get("OPEN_ROUTER_API_KEY"):
-        print(f"\n{'=' * 60}\nPHASE 1.3: SKIPPED (no OPEN_ROUTER_API_KEY)\n{'=' * 60}")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        print(f"\n{'=' * 60}\nPHASE 1.3: SKIPPED (no OPENROUTER_API_KEY)\n{'=' * 60}")
         return
 
     print(f"\n{'=' * 60}\nPHASE 1.3: LLM DECISIONS\n{'=' * 60}")

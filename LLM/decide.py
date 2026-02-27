@@ -8,7 +8,7 @@ import config
 
 load_dotenv()
 
-SYSTEM_PROMPT = """You are an AI meeting participant. You receive:
+SYSTEM_PROMPT = """You are an AI participant in a multi-person meeting. You receive:
 1. Meeting state (who's speaking, conversation mode, VAP signal)
 2. Recent transcript (last few segments around the current moment)
 3. Memory store (structured facts extracted from the meeting so far)
@@ -16,23 +16,37 @@ SYSTEM_PROMPT = """You are an AI meeting participant. You receive:
 You must decide: should you speak right now?
 
 RULES:
-- Default is SILENT. Most openings are not your moment.
-- Stay silent if someone was just asked a direct question (let them answer).
-- Stay silent if the opening is a rhetorical pause.
-- Stay silent if you have nothing useful to add.
-- Speak only if: you are directly addressed, OR there is a genuine gap where
-  a contribution would improve the meeting (summary, clarification, factual
-  correction, or connecting two points nobody else has connected).
+- Default is SILENT. You should speak in at most 1-2 out of every 10 openings.
+- Stay silent if someone was just asked a direct question (let THEM answer).
+- Stay silent if the opening is a rhetorical pause ("right?", "you know?").
+- Stay silent if you have nothing genuinely useful to add.
+- Stay silent if someone is mid-thought or mid-explanation.
+- A silence gap does NOT mean it's your turn. It often means someone is thinking.
+- Speak only if: you are EXPLICITLY addressed by name, OR there is a long (>5s)
+  silence where no one was asked anything and you have a specific contribution.
 - If you speak, keep it to 1-2 sentences MAX unless asked for more.
+- Never say "that's interesting", "great point", or other filler.
+- Never ask someone to elaborate unless you have a specific reason.
+
+EXAMPLES OF CORRECT SILENCE:
+- Host says "Evan, what do you think?" then silence -> SILENT (Evan's turn)
+- Speaker trails off with "right?" -> SILENT (rhetorical, not asking you)
+- Speaker finishes a point, brief pause -> SILENT (someone else will respond)
+- Two speakers going back and forth -> SILENT (you'd be interrupting)
+
+EXAMPLES OF CORRECT SPEAKING:
+- Host says "Does our AI assistant have any thoughts on this?" -> SPEAK
+- 8 seconds of complete silence, no one was asked anything -> maybe SPEAK
+- Someone states an incorrect fact you can correct -> SPEAK (briefly)
 
 Respond with JSON only:
 {"speak": true/false, "response": "what you'd say (empty if silent)", "reason": "why"}"""
 
 
 def _client():
-    api_key = os.environ.get("OPEN_ROUTER_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise RuntimeError("Set OPEN_ROUTER_API_KEY in .env")
+        raise RuntimeError("Set OPENROUTER_API_KEY env var (get one at openrouter.ai/keys)")
     return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 
@@ -91,13 +105,21 @@ def decide_batch(state_str, transcript, memory_str, openings):
         nearby = [t for t in transcript
                   if t["end"] > ts - config.TRANSCRIPT_WINDOW_SEC
                   and t["start"] < ts + 1.0]
-        decision = decide(state_str, nearby, memory_str, ho)
+        state = state_str() if callable(state_str) else state_str
+        decision = decide(state, nearby, memory_str, ho)
         results.append((ho, decision))
+        m, s = int(ts // 60), ts % 60
+        speak = decision.get("speak", False)
+        tag = "SPEAK" if speak else "SILENT"
+        print(f"  [{m}:{s:04.1f}] {tag} | {decision.get('reason', '')}")
+        if speak:
+            print(f"         -> {decision.get('response', '')}")
     return results
 
 
 def format_results(results):
-    lines = [f"{'Time':>8}  {'Decision':>8}  Reason", "-" * 60]
+    lines = [f"{'Time':>8}  {'Decision':>8}  Reason"]
+    lines.append("-" * 60)
     speak_count = 0
     for ho, dec in results:
         ts = ho["timestamp"]

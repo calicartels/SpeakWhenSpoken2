@@ -4,6 +4,19 @@ from gliner import GLiNER
 
 import config
 
+PERSON_STOPWORDS = {
+    "i", "me", "my", "mine", "myself",
+    "you", "your", "yours", "yourself",
+    "he", "him", "his", "himself",
+    "she", "her", "hers", "herself",
+    "we", "us", "our", "ours", "ourselves",
+    "they", "them", "their", "theirs", "themselves",
+    "it", "its", "itself",
+    "who", "whom", "whose",
+    "someone", "anyone", "everyone", "nobody",
+    "people", "person", "model",
+}
+
 
 def load_model():
     return GLiNER.from_pretrained(config.GLINER_MODEL)
@@ -13,7 +26,12 @@ def extract(model, text):
     if not text or len(text.strip()) < 10:
         return []
     entities = model.predict_entities(text, config.ENTITY_LABELS, threshold=config.ENTITY_THRESHOLD)
-    return [{"text": e["text"], "label": e["label"], "score": e["score"]} for e in entities]
+    filtered = []
+    for e in entities:
+        if e["label"] == "person" and e["text"].lower().strip() in PERSON_STOPWORDS:
+            continue
+        filtered.append({"text": e["text"], "label": e["label"], "score": e["score"]})
+    return filtered
 
 
 def new_store():

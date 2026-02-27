@@ -44,7 +44,7 @@ GLINER_MODEL = "urchade/gliner_medium-v2.1"
 ENTITY_LABELS = ["person", "company", "product", "topic", "date", "number", "action item", "decision"]
 ENTITY_THRESHOLD = 0.4
 
-DECISION_MODEL = "meta-llama/llama-4-scout"
-DECISION_USE_NITRO = True
+DECISION_MODEL = "anthropic/claude-haiku-4.5"
+DECISION_USE_NITRO = False
 DECISION_MAX_TOKENS = 200
-DECISION_TEMPERATURE = 0.1
+DECISION_TEMPERATURE = 0.0
