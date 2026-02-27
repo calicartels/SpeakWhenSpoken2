@@ -1,7 +1,6 @@
 import time
 
 import config
-from INPUT_PIPELINE.voxtral import load_model as load_voxtral, transcribe_chunk
 
 FRAME_SEC = 0.08
 
@@ -40,6 +39,7 @@ def extract_segments(probs):
 
 
 def transcribe_all(audio, sr, segments, model=None, proc=None):
+    from INPUT_PIPELINE.voxtral import load_model as load_voxtral, transcribe_chunk
     if model is None or proc is None:
         model, proc = load_voxtral()
 
