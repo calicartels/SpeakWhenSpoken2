@@ -1,49 +1,103 @@
-import os
+import asyncio
+import base64
+import json
+import logging
 
-import torch
-from mistral_common.tokens.tokenizers.audio import Audio
-from transformers import AutoProcessor, VoxtralRealtimeForConditionalGeneration
+import numpy as np
+import websockets
 
 import config
 
+log = logging.getLogger("voxtral")
+
+VLLM_URL = f"ws://localhost:{config.VLLM_PORT}/v1/realtime"
+MAX_CONNECT_ATTEMPTS = 30
+CONNECT_RETRY_SEC = 2
+
 
 def load_model():
-    processor = AutoProcessor.from_pretrained(config.VOXTRAL_MODEL)
-    model = VoxtralRealtimeForConditionalGeneration.from_pretrained(
-        config.VOXTRAL_MODEL,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-    )
-    if torch.cuda.is_available():
-        gb = torch.cuda.memory_allocated() / 1e9
-        print(f"VRAM: {gb:.1f}GB")
-    return model, processor
+    """No local model -- vLLM serves Voxtral externally."""
+    return None, None
 
 
-def transcribe(model, processor, audio_path):
-    audio = Audio.from_file(audio_path, strict=False)
-    audio.resample(processor.feature_extractor.sampling_rate)
-    inputs = processor(audio.audio_array, return_tensors="pt")
-    inputs = inputs.to(model.device, dtype=model.dtype)
-    with torch.no_grad():
-        outputs = model.generate(**inputs)
-    text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
+async def new_stream(_model=None, _proc=None):
+    """Open a realtime session with the vLLM WebSocket endpoint."""
+    ws = None
+    for attempt in range(MAX_CONNECT_ATTEMPTS):
+        try:
+            ws = await asyncio.wait_for(
+                websockets.connect(VLLM_URL), timeout=5
+            )
+            break
+        except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
+            if attempt < MAX_CONNECT_ATTEMPTS - 1:
+                log.info("vLLM not ready, retry %d/%d...", attempt + 1, MAX_CONNECT_ATTEMPTS)
+                await asyncio.sleep(CONNECT_RETRY_SEC)
+
+    if ws is None:
+        raise RuntimeError(f"Cannot connect to vLLM at {VLLM_URL}")
+
+    response = json.loads(await ws.recv())
+    if response.get("type") != "session.created":
+        raise RuntimeError(f"Expected session.created, got {response}")
+
+    await ws.send(json.dumps({"type": "session.update", "model": config.VOXTRAL_MODEL}))
+    await ws.send(json.dumps({"type": "input_audio_buffer.commit"}))
+
+    stream = {"ws": ws, "text_buf": [], "done": False}
+    stream["recv_task"] = asyncio.create_task(_recv_loop(stream))
+    return stream
+
+
+async def _recv_loop(stream):
+    """Background coroutine: drain transcription deltas from vLLM."""
+    try:
+        async for message in stream["ws"]:
+            data = json.loads(message)
+            if data["type"] in ("transcription.delta", "response.text.delta"):
+                stream["text_buf"].append(data.get("delta", ""))
+            elif data["type"] in ("transcription.done", "response.done"):
+                stream["done"] = True
+            elif data["type"] == "error":
+                log.warning("vLLM error: %s", data.get("error", data))
+    except websockets.exceptions.ConnectionClosed:
+        pass
+    except asyncio.CancelledError:
+        pass
+
+
+async def feed_audio(stream, samples_f32):
+    """Convert float32 samples to PCM16 and send to vLLM."""
+    pcm16 = (samples_f32 * 32767).astype(np.int16)
+    audio_b64 = base64.b64encode(pcm16.tobytes()).decode()
+    try:
+        await stream["ws"].send(json.dumps({
+            "type": "input_audio_buffer.append",
+            "audio": audio_b64,
+        }))
+    except websockets.exceptions.ConnectionClosed:
+        pass
+
+
+def get_text(stream):
+    """Non-blocking: drain all buffered transcription text."""
+    if not stream["text_buf"]:
+        return ""
+    text = "".join(stream["text_buf"])
+    stream["text_buf"].clear()
     return text
 
 
-def transcribe_chunk(model, processor, chunk, sr):
-    if len(chunk) < sr * 0.3:
-        return ""
-    inputs = processor(chunk, sampling_rate=sr, return_tensors="pt")
-    inputs = inputs.to(model.device, dtype=model.dtype)
-    with torch.no_grad():
-        outputs = model.generate(**inputs)
-    text = processor.batch_decode(outputs, skip_special_tokens=True)[0]
-    return text.strip()
-
-
-if __name__ == "__main__":
-    model, processor = load_model()
-    print(transcribe(model, processor, config.TEST_AUDIO))
-    if os.path.exists(config.HARD_AUDIO):
-        print(transcribe(model, processor, config.HARD_AUDIO))
+async def stop_stream(stream):
+    """Signal end-of-audio and close the vLLM session."""
+    try:
+        await stream["ws"].send(json.dumps({
+            "type": "input_audio_buffer.commit", "final": True,
+        }))
+    except Exception:
+        pass
+    stream["recv_task"].cancel()
+    try:
+        await stream["ws"].close()
+    except Exception:
+        pass

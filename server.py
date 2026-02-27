@@ -1,44 +1,61 @@
 import asyncio
+import collections
 import json
 import base64
-import tempfile
+import logging
 import os
+import time
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import numpy as np
-import soundfile as sf
 import websockets
 from websockets.exceptions import ConnectionClosed
 
 import config
 import gate
-from INPUT_PIPELINE.sortformer import load_model as load_sortformer, diarize
+from INPUT_PIPELINE import sortformer, voxtral
 from LLM import decide as decide_module
 from VAP import vap, dyad, state, router
 from LLM import memory
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+log = logging.getLogger("server")
+
 FRAME_SEC = 0.08
 FRAME_SAMPLES = int(FRAME_SEC * config.SAMPLE_RATE)
 
-# Run Sortformer every 5s (62 frames). Needs longer segments for accuracy.
-DIAR_INTERVAL_FRAMES = 62
-
-# Run VAP every 4 frames (320ms) — same as orchestrate.py.
 VAP_INTERVAL = 4
-
-# Run GLiNER every 125 frames (~10s) on accumulated transcript.
 GLINER_INTERVAL = 125
+GLINER_MIN_WORDS = 10
+MAX_AUDIO_BUF_SEC = 60
+SEGMENT_GAP_FRAMES = int(1.5 / FRAME_SEC)
 
 models = {}
+log_buffer = collections.deque(maxlen=200)
+log_clients = set()
+
+
+def slog(msg):
+    log.info(msg)
+    entry = {"ts": time.time(), "msg": msg}
+    log_buffer.append(entry)
 
 
 def load_all():
-    print("Loading Sortformer...")
-    models["sortformer"] = load_sortformer()
-    print("Loading VAP (maai)...")
+    slog("Loading Sortformer (streaming)...")
+    models["sortformer"] = sortformer.load_model()
+    slog("Loading VAP (maai)...")
     models["vap"] = vap.load_vap()
-    print("Loading GLiNER...")
+    slog(f"Voxtral served by vLLM (port {config.VLLM_PORT})")
+    models["voxtral_model"], models["voxtral_proc"] = voxtral.load_model()
+    slog("Loading GLiNER...")
     models["gliner"] = memory.load_model()
-    print("All models loaded")
+    slog("All models loaded")
 
 
 async def handle_client(websocket):
@@ -49,15 +66,30 @@ async def handle_client(websocket):
     prev_dyad = None
     mem_store = memory.new_store()
     transcript_accum = []
+    cur_seg = {"text": "", "start": 0.0, "end": 0.0, "slot_id": -1, "speaker": "unknown"}
+    last_text_frame = 0
 
-    # Sortformer needs a file path — accumulate audio and write periodically.
-    diar_buf = np.zeros(0, dtype=np.float32)
-    last_probs = [[0.0, 0.0, 0.0, 0.0]]
+    last_probs = [0.0, 0.0, 0.0, 0.0]
     last_gate_time = 0.0
     GATE_COOLDOWN_SEC = 5.0
+    vox_stream = await voxtral.new_stream(models["voxtral_model"], models["voxtral_proc"])
+
+    slog("Client connected (vLLM realtime session open)")
 
     async for message in websocket:
-        msg = json.loads(message)
+        try:
+            msg = json.loads(message)
+        except json.JSONDecodeError:
+            continue
+
+        if msg.get("type") == "log_subscribe":
+            since = msg.get("since", 0)
+            recent = [e for e in log_buffer if e["ts"] > since]
+            try:
+                await websocket.send(json.dumps({"server_log": recent}))
+            except ConnectionClosed:
+                break
+            continue
 
         if msg["type"] == "stop":
             break
@@ -65,29 +97,35 @@ async def handle_client(websocket):
         if msg["type"] != "audio":
             continue
 
-        chunk = np.frombuffer(base64.b64decode(msg["data"]), dtype=np.float32)
+        raw = base64.b64decode(msg["data"])
+        chunk = np.frombuffer(raw, dtype=np.float32)
         audio_buf = np.append(audio_buf, chunk)
-        diar_buf = np.append(diar_buf, chunk)
 
-        max_diar_samples = 30 * config.SAMPLE_RATE
-        if len(diar_buf) > max_diar_samples:
-            diar_buf = diar_buf[-max_diar_samples:]
+        max_audio_samples = MAX_AUDIO_BUF_SEC * config.SAMPLE_RATE
+        if len(audio_buf) > max_audio_samples:
+            audio_buf = audio_buf[-max_audio_samples:]
 
         frame_count += 1
-        results = {}
+        results = {"debug": {"frame": frame_count, "ts": round(frame_count * FRAME_SEC, 2),
+                              "chunk_samples": len(chunk), "audio_buf_sec": round(len(audio_buf) / config.SAMPLE_RATE, 1)}}
 
-        if frame_count % DIAR_INTERVAL_FRAMES == 0 and len(diar_buf) > config.SAMPLE_RATE * 2:
-            probs_list = _run_sortformer(diar_buf)
-            if probs_list:
-                last_probs = probs_list
-                results["diarization"] = {
-                    "n_frames": len(probs_list),
-                    "latest_probs": probs_list[-1],
-                }
+        if frame_count == 1:
+            slog(f"First audio frame received ({len(chunk)} samples)")
+        if frame_count % 100 == 0:
+            slog(f"Frame {frame_count}, audio_buf={len(audio_buf)/config.SAMPLE_RATE:.1f}s")
+
+        await voxtral.feed_audio(vox_stream, chunk)
+
+        probs_frames = sortformer.push_audio(models["sortformer"], chunk)
+        if probs_frames:
+            last_probs = probs_frames[-1]
+            results["diarization"] = {
+                "n_frames": len(probs_frames),
+                "latest_probs": last_probs,
+            }
 
         ts = frame_count * FRAME_SEC
-        probs_idx = min(frame_count - 1, len(last_probs) - 1)
-        current_probs = last_probs[probs_idx] if probs_idx >= 0 else [0.0, 0.0, 0.0, 0.0]
+        current_probs = last_probs
 
         frame_start = max(0, len(audio_buf) - FRAME_SAMPLES)
         frame_audio = audio_buf[frame_start:frame_start + FRAME_SAMPLES]
@@ -150,8 +188,9 @@ async def handle_client(websocket):
                 try:
                     opening = {"timestamp": ts, "ai_opening": vap_out["ai_opening"], "mode": dyad_out["mode"],
                                "active_speakers": results["state"]["active_speakers"], "reason": reason}
-                    gate_open["decision"] = decide_module.decide(
-                        gate_open["meeting_state"], [], gate_open["memory"], opening
+                    gate_open["decision"] = await asyncio.to_thread(
+                        decide_module.decide,
+                        gate_open["meeting_state"], [], gate_open["memory"], opening,
                     )
                 except Exception:
                     gate_open["decision"] = {"speak": False, "reason": "LLM call failed", "response": ""}
@@ -159,37 +198,55 @@ async def handle_client(websocket):
 
         if frame_count % GLINER_INTERVAL == 0 and transcript_accum:
             combined = " ".join(t.get("text", "") for t in transcript_accum[-20:])
-            entities = memory.extract(models["gliner"], combined)
-            if entities:
-                for ent in entities:
-                    seg_stub = {"speaker": "live", "start": ts, "end": ts}
-                    memory.update(mem_store, seg_stub, [ent])
-                results["entities"] = [
-                    {"text": e["text"], "label": e["label"], "score": e["score"]}
-                    for e in entities
-                ]
-                results["memory"] = memory.render_for_llm(mem_store)
+            if len(combined.split()) >= GLINER_MIN_WORDS:
+                entities = await asyncio.to_thread(memory.extract, models["gliner"], combined)
+                if entities:
+                    for ent in entities:
+                        seg_stub = {"speaker": "live", "start": ts, "end": ts}
+                        memory.update(mem_store, seg_stub, [ent])
+                    results["entities"] = [
+                        {"text": e["text"], "label": e["label"], "score": e["score"]}
+                        for e in entities
+                    ]
+                    results["memory"] = memory.render_for_llm(mem_store)
 
         prev_dyad = dyad_out
 
-        if results:
-            try:
-                await websocket.send(json.dumps(results, default=_serialize))
-            except ConnectionClosed:
-                break
+        new_text = voxtral.get_text(vox_stream)
+        if new_text:
+            dom = dyad_out["dominant"] if dyad_out else None
+            slot_id = dom if dom is not None else -1
+            speaker = f"slot_{dom}" if dom is not None else "unknown"
 
+            if cur_seg["text"] and cur_seg["slot_id"] != slot_id and slot_id != -1:
+                transcript_accum.append(dict(cur_seg))
+                results.setdefault("transcript", []).append(dict(cur_seg))
+                cur_seg = {"text": "", "start": 0.0, "end": 0.0, "slot_id": -1, "speaker": "unknown"}
 
-def _run_sortformer(audio_np):
-    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    try:
-        sf.write(tmp.name, audio_np, config.SAMPLE_RATE)
-        segments, probs = diarize(models["sortformer"], tmp.name)
-        arr = probs.cpu().numpy()
-        if arr.ndim == 3:
-            arr = arr[0]
-        return [list(arr[t]) for t in range(arr.shape[0])]
-    finally:
-        os.unlink(tmp.name)
+            if not cur_seg["text"]:
+                cur_seg.update(start=round(ts, 2), slot_id=slot_id, speaker=speaker)
+
+            cur_seg["text"] += new_text
+            cur_seg["end"] = round(ts, 2)
+            last_text_frame = frame_count
+
+            stripped = cur_seg["text"].rstrip()
+            if stripped and stripped[-1] in ".?!":
+                transcript_accum.append(dict(cur_seg))
+                results.setdefault("transcript", []).append(dict(cur_seg))
+                cur_seg = {"text": "", "start": 0.0, "end": 0.0, "slot_id": -1, "speaker": "unknown"}
+
+        elif cur_seg["text"] and frame_count - last_text_frame > SEGMENT_GAP_FRAMES:
+            transcript_accum.append(dict(cur_seg))
+            results.setdefault("transcript", []).append(dict(cur_seg))
+            cur_seg = {"text": "", "start": 0.0, "end": 0.0, "slot_id": -1, "speaker": "unknown"}
+
+        try:
+            await websocket.send(json.dumps(results, default=_serialize))
+        except ConnectionClosed:
+            slog("Client disconnected")
+            await voxtral.stop_stream(vox_stream)
+            break
 
 
 def _serialize(obj):

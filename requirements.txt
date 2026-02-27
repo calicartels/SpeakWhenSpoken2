@@ -24,9 +24,7 @@ wrapt
 lightning>2.2.1,<=2.4.0
 soundfile>=0.12
 datasets>=2.14
-torchcodec
-transformers>=5.2.0
-mistral-common[audio]>=1.9.0
+transformers
 maai>=0.1.0
 scipy>=1.10
 gliner>=0.2
