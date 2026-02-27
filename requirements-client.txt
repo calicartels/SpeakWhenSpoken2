@@ -1,0 +1,6 @@
+# Laptop only — no GPU. Run: pip install -r requirements-client.txt
+numpy
+websockets>=12
+sounddevice
+openai>=1.0
+python-dotenv>=1.0

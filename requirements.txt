@@ -32,3 +32,4 @@ scipy>=1.10
 gliner>=0.2
 openai>=1.0
 python-dotenv>=1.0
+websockets>=12
