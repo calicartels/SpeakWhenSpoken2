@@ -139,13 +139,13 @@ def run_real(audio_path=None, max_sec=None):
             sf.write(f.name, audio, config.SAMPLE_RATE)
             sortformer_path = f.name
         try:
-            from input_pipeline.sortformer import load_model, get_frame_probs
+            from INPUT_PIPELINE.sortformer import load_model, get_frame_probs
             model = load_model()
             probs_list = get_frame_probs(model, sortformer_path)
         finally:
             os.unlink(sortformer_path)
     else:
-        from input_pipeline.sortformer import load_model, get_frame_probs
+        from INPUT_PIPELINE.sortformer import load_model, get_frame_probs
         model = load_model()
         probs_list = get_frame_probs(model, audio_path)
 

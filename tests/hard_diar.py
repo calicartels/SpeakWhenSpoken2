@@ -8,7 +8,7 @@ import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import config
-from input_pipeline.sortformer import load_model, diarize
+from INPUT_PIPELINE.sortformer import load_model, diarize
 
 PROB_THRESHOLD = 0.5
 

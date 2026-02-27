@@ -1,7 +1,7 @@
 import time
 
 import config
-from input_pipeline.voxtral import load_model as load_voxtral, transcribe_chunk
+from INPUT_PIPELINE.voxtral import load_model as load_voxtral, transcribe_chunk
 
 FRAME_SEC = 0.08
 

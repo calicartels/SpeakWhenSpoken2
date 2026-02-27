@@ -2,10 +2,10 @@ import torch
 import torchaudio
 
 import config
-from input_pipeline.ecapa import load_model as load_ecapa
-from input_pipeline.sortformer import diarize, load_model as load_sortformer
-from input_pipeline.voxtral import load_model as load_voxtral, transcribe_chunk
-from input_pipeline.identity import (
+from INPUT_PIPELINE.ecapa import load_model as load_ecapa
+from INPUT_PIPELINE.sortformer import diarize, load_model as load_sortformer
+from INPUT_PIPELINE.voxtral import load_model as load_voxtral, transcribe_chunk
+from INPUT_PIPELINE.identity import (
     load_address_book, new_session, update_slot,
     resolve_identities, get_identity, commit_session,
 )

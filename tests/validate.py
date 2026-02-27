@@ -7,7 +7,7 @@ import soundfile as sf
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import config
-from input_pipeline import transcribe
+from INPUT_PIPELINE import transcribe
 from VAP import orchestrate, vap
 from LLM import memory, decide
 from tests import baseline
@@ -41,7 +41,7 @@ def run():
             transcript = json.load(f)
         print(f"Loaded cached transcript: {len(transcript)} segments")
     else:
-        from input_pipeline.voxtral import load_model as load_voxtral
+        from INPUT_PIPELINE.voxtral import load_model as load_voxtral
         model, proc = load_voxtral()
         transcript = transcribe.transcribe_all(audio, sr, segments, model, proc)
         with open(config.TRANSCRIPT_CACHE_PATH, "w") as f:
