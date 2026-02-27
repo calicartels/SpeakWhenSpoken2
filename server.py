@@ -7,10 +7,12 @@ import os
 import numpy as np
 import soundfile as sf
 import websockets
+from websockets.exceptions import ConnectionClosed
 
 import config
 import gate
 from INPUT_PIPELINE.sortformer import load_model as load_sortformer, diarize
+from LLM import decide as decide_module
 from VAP import vap, dyad, state, router
 from LLM import memory
 
@@ -51,6 +53,8 @@ async def handle_client(websocket):
     # Sortformer needs a file path — accumulate audio and write periodically.
     diar_buf = np.zeros(0, dtype=np.float32)
     last_probs = [[0.0, 0.0, 0.0, 0.0]]
+    last_gate_time = 0.0
+    GATE_COOLDOWN_SEC = 5.0
 
     async for message in websocket:
         msg = json.loads(message)
@@ -124,14 +128,16 @@ async def handle_client(websocket):
                 "active_speakers": [
                     k for k, v in meeting["speakers"].items() if v["is_active"]
                 ],
+                "speaker_probs": current_probs,
                 "silence_gap_sec": meeting["silence"]["current_gap_sec"],
             }
 
-            if gate.should_open(vap_out["ai_opening"], dyad_out["mode"], dom_prob):
+            if gate.should_open(vap_out["ai_opening"], dyad_out["mode"], dom_prob) and ts - last_gate_time >= GATE_COOLDOWN_SEC:
+                last_gate_time = ts
                 reason = "silence_gap" if dyad_out["mode"] == "silence" else (
                     "speaker_fading" if dom_prob is not None and dom_prob < config.GATE_FADE_PROB else "prosodic_boundary"
                 )
-                results["gate_open"] = {
+                gate_open = {
                     "timestamp": ts,
                     "ai_opening": vap_out["ai_opening"],
                     "mode": dyad_out["mode"],
@@ -141,6 +147,15 @@ async def handle_client(websocket):
                     "meeting_state": state.render_for_llm(meeting),
                     "memory": memory.render_for_llm(mem_store),
                 }
+                try:
+                    opening = {"timestamp": ts, "ai_opening": vap_out["ai_opening"], "mode": dyad_out["mode"],
+                               "active_speakers": results["state"]["active_speakers"], "reason": reason}
+                    gate_open["decision"] = decide_module.decide(
+                        gate_open["meeting_state"], [], gate_open["memory"], opening
+                    )
+                except Exception:
+                    gate_open["decision"] = {"speak": False, "reason": "LLM call failed", "response": ""}
+                results["gate_open"] = gate_open
 
         if frame_count % GLINER_INTERVAL == 0 and transcript_accum:
             combined = " ".join(t.get("text", "") for t in transcript_accum[-20:])
@@ -158,7 +173,10 @@ async def handle_client(websocket):
         prev_dyad = dyad_out
 
         if results:
-            await websocket.send(json.dumps(results, default=_serialize))
+            try:
+                await websocket.send(json.dumps(results, default=_serialize))
+            except ConnectionClosed:
+                break
 
 
 def _run_sortformer(audio_np):

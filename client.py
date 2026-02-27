@@ -94,7 +94,7 @@ async def _recv_loop(ws):
             print(f"\n  GATE OPEN [{m}:{s:04.1f}] "
                   f"vap={g['ai_opening']:.2f} mode={g['mode']}")
 
-            decision = _call_llm(g)
+            decision = g.get("decision") or _call_llm(g)
             if decision:
                 speak = decision.get("speak", False)
                 tag = "SPEAK" if speak else "SILENT"
@@ -111,6 +111,8 @@ async def _recv_loop(ws):
 
 
 def _call_llm(gate_event):
+    from dotenv import load_dotenv
+    load_dotenv()
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         return {"speak": False, "reason": "no API key"}
@@ -134,6 +136,28 @@ def _call_llm(gate_event):
 
 host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
 port = sys.argv[2] if len(sys.argv) > 2 else "8765"
+port_int = int(port)
 url = f"ws://{host}:{port}"
+
+
+def _can_reach():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(3)
+    try:
+        s.connect((host, port_int))
+        s.close()
+        return True
+    except (socket.error, OSError):
+        return False
+
+
+if not _can_reach():
+    print(f"Cannot reach {host}:{port}. Connection refused.")
+    if host == "localhost" and port_int == 8765:
+        print("Is the SSH tunnel running? In a Mac terminal, run:")
+        print("  ssh -p <PORT> root@<VAST-IP> -L 8765:localhost:8765")
+        print("Keep it open, then run the server in that session (or in Jupyter).")
+    sys.exit(1)
 
 asyncio.run(stream(url))

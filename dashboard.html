@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pipeline Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: ui-monospace, monospace; font-size: 12px; margin: 0; padding: 12px; background: #0d1117; color: #c9d1d9; }
+    h1 { font-size: 14px; margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
+    .card h2 { font-size: 11px; margin: 0 0 8px; color: #8b949e; text-transform: uppercase; }
+    #waveform { width: 100%; height: 80px; background: #0d1117; border-radius: 4px; display: block; }
+    .prob-bar { height: 20px; margin: 2px 0; background: #21262d; border-radius: 3px; overflow: hidden; }
+    .prob-bar span { display: block; height: 100%; background: #238636; transition: width 0.1s; }
+    .prob-bar span.low { background: #30363d; }
+    .metric { margin: 4px 0; }
+    .metric span { color: #8b949e; }
+    .mode { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    .mode.silence { background: #21262d; }
+    .mode.solo { background: #1f6feb; }
+    .mode.dyad { background: #8957e5; }
+    .mode.multi { background: #bf8700; }
+    .log { max-height: 120px; overflow-y: auto; font-size: 11px; }
+    .log div { padding: 2px 0; border-bottom: 1px solid #21262d; }
+    .log .gate { color: #58a6ff; }
+    .log .speak { color: #3fb950; }
+    .log .silent { color: #8b949e; }
+    .status { margin-bottom: 8px; }
+    .status.connected { color: #3fb950; }
+    .status.disconnected { color: #f85149; }
+    input { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; }
+    button { background: #238636; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+    button:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    .entity { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 6px; background: #21262d; border-radius: 3px; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Pipeline Dashboard</h1>
+  <div class="status disconnected" id="status">Disconnected</div>
+  <div style="margin-bottom: 8px;">
+    <input type="text" id="wsUrl" value="ws://localhost:8765" style="width: 200px;">
+    <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn" disabled>Disconnect</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Waveform</h2>
+      <canvas id="waveform" width="400" height="80"></canvas>
+    </div>
+    <div class="card">
+      <h2>Active Speakers</h2>
+      <div id="activeCount">0</div>
+      <div id="activeSlots"></div>
+    </div>
+    <div class="card">
+      <h2>Speaker Probabilities</h2>
+      <div id="speakerProbs"></div>
+    </div>
+    <div class="card">
+      <h2>VAP</h2>
+      <div class="metric"><span>ai_opening:</span> <span id="vapOpening">-</span></div>
+      <div class="metric"><span>turn_hold:</span> <span id="vapHold">-</span></div>
+      <div class="metric"><span>confidence:</span> <span id="vapConf">-</span></div>
+      <div class="metric"><span>silence_gap:</span> <span id="silenceGap">-</span>s</div>
+    </div>
+    <div class="card">
+      <h2>Mode</h2>
+      <span id="mode" class="mode silence">-</span>
+      <div class="metric"><span>dominant:</span> <span id="dominant">-</span></div>
+    </div>
+    <div class="card">
+      <h2>Gate & LLM</h2>
+      <div id="gateLog" class="log"></div>
+    </div>
+    <div class="card">
+      <h2>Entities</h2>
+      <div id="entities"></div>
+    </div>
+    <div class="card">
+      <h2>Transcript</h2>
+      <div id="transcript" style="font-size: 11px; color: #8b949e;">Live ASR not enabled</div>
+    </div>
+  </div>
+
+  <script>
+    const SAMPLE_RATE = 16000;
+    const CHUNK_MS = 80;
+    const CHUNK_SAMPLES = (SAMPLE_RATE * CHUNK_MS) / 1000;
+
+    let ws = null;
+    let audioCtx = null;
+    let stream = null;
+    let processor = null;
+    let waveformBuf = new Float32Array(0);
+    const WAVEFORM_LEN = 2048;
+
+    const statusEl = document.getElementById('status');
+    const waveformCanvas = document.getElementById('waveform');
+    const ctx = waveformCanvas.getContext('2d');
+
+    function setStatus(connected) {
+      statusEl.textContent = connected ? 'Connected' : 'Disconnected';
+      statusEl.className = 'status ' + (connected ? 'connected' : 'disconnected');
+      document.getElementById('connectBtn').disabled = connected;
+      document.getElementById('disconnectBtn').disabled = !connected;
+    }
+
+    function drawWaveform() {
+      const w = waveformCanvas.width;
+      const h = waveformCanvas.height;
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, w, h);
+      if (waveformBuf.length < 2) return;
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const step = Math.max(1, Math.floor(waveformBuf.length / w));
+      const mid = h / 2;
+      for (let i = 0; i < w; i++) {
+        const idx = Math.min(i * step, waveformBuf.length - 1);
+        const v = waveformBuf[idx] || 0;
+        const y = mid - v * (h / 2) * 0.8;
+        if (i === 0) ctx.moveTo(i, y);
+        else ctx.lineTo(i, y);
+      }
+      ctx.stroke();
+    }
+
+    function updateSpeakerProbs(probs) {
+      const el = document.getElementById('speakerProbs');
+      if (!probs || probs.length === 0) {
+        el.innerHTML = '';
+        return;
+      }
+      el.innerHTML = probs.map((p, i) => {
+        const v = Math.min(1, Math.max(0, p));
+        return `<div class="prob-bar">Slot ${i}: <span style="width:${v * 100}%" class="${v < 0.3 ? 'low' : ''}"></span></div>`;
+      }).join('');
+    }
+
+    function updateUI(data) {
+      if (data.state) {
+        const s = data.state;
+        const active = s.active_speakers || [];
+        document.getElementById('activeCount').textContent = active.length;
+        document.getElementById('activeSlots').textContent = active.length ? active.join(', ') : 'none';
+        document.getElementById('mode').textContent = s.mode || '-';
+        document.getElementById('mode').className = 'mode ' + (s.mode || 'silence');
+        document.getElementById('dominant').textContent = s.dominant !== undefined && s.dominant !== null ? s.dominant : '-';
+        updateSpeakerProbs(s.speaker_probs);
+        document.getElementById('silenceGap').textContent = (s.silence_gap_sec ?? 0).toFixed(1);
+      }
+      if (data.vap) {
+        document.getElementById('vapOpening').textContent = (data.vap.ai_opening ?? 0).toFixed(2);
+        document.getElementById('vapHold').textContent = (data.vap.turn_hold ?? 0).toFixed(2);
+        document.getElementById('vapConf').textContent = (data.vap.confidence ?? 0).toFixed(2);
+      }
+      if (data.gate_open) {
+        const g = data.gate_open;
+        const log = document.getElementById('gateLog');
+        const dec = g.decision;
+        const tag = dec && dec.speak ? 'speak' : 'silent';
+        const reason = dec ? dec.reason : 'no decision';
+        const line = document.createElement('div');
+        line.className = 'gate ' + tag;
+        line.textContent = `[${g.timestamp.toFixed(1)}s] ${dec && dec.speak ? 'SPEAK' : 'SILENT'}: ${reason}`;
+        log.appendChild(line);
+        while (log.children.length > 20) log.removeChild(log.firstChild);
+        log.scrollTop = log.scrollHeight;
+      }
+      if (data.entities && data.entities.length > 0) {
+        const el = document.getElementById('entities');
+        el.innerHTML = data.entities.map(e => `<span class="entity">${e.label}: ${e.text}</span>`).join('');
+      }
+    }
+
+    function connect() {
+      const url = document.getElementById('wsUrl').value;
+      ws = new WebSocket(url);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => setStatus(true);
+      ws.onclose = () => setStatus(false);
+      ws.onerror = () => setStatus(false);
+
+      ws.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          updateUI(data);
+        } catch (_) {}
+      };
+    }
+
+    function disconnect() {
+      if (ws) {
+        ws.send(JSON.stringify({ type: 'stop' }));
+        ws.close();
+        ws = null;
+      }
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      setStatus(false);
+    }
+
+    async function startAudio() {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: SAMPLE_RATE, channelCount: 1 } });
+      audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const src = audioCtx.createMediaStreamSource(stream);
+      processor = audioCtx.createScriptProcessor(CHUNK_SAMPLES, 1, 1);
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const chunk = new Float32Array(input.length);
+        chunk.set(input);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const bytes = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          ws.send(JSON.stringify({ type: 'audio', data: btoa(binary) }));
+        }
+        const newBuf = new Float32Array(waveformBuf.length + chunk.length);
+        newBuf.set(waveformBuf);
+        newBuf.set(chunk, waveformBuf.length);
+        if (newBuf.length > WAVEFORM_LEN) {
+          waveformBuf = newBuf.slice(-WAVEFORM_LEN);
+        } else {
+          waveformBuf = newBuf;
+        }
+      };
+      src.connect(processor);
+      processor.connect(audioCtx.destination);
+    }
+
+    document.getElementById('connectBtn').onclick = async () => {
+      await startAudio();
+      connect();
+    };
+    document.getElementById('disconnectBtn').onclick = disconnect;
+
+    setInterval(drawWaveform, 50);
+  </script>
+</body>
+</html>
