@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from VAP import orchestrate
 from VAP import vap
@@ -118,7 +118,7 @@ def run_real(audio_path=None, max_sec=None):
             wav = torchaudio.functional.resample(wav, sr, config.SAMPLE_RATE)
             sr = config.SAMPLE_RATE
         audio = wav.numpy().astype(np.float32)
-    except Exception as e:
+    except Exception:
         import soundfile as sf
         data, sr = sf.read(audio_path, dtype="float32")
         if data.ndim > 1:
@@ -139,14 +139,13 @@ def run_real(audio_path=None, max_sec=None):
             sf.write(f.name, audio, config.SAMPLE_RATE)
             sortformer_path = f.name
         try:
-            from sortformer import load_model, get_frame_probs
+            from input_pipeline.sortformer import load_model, get_frame_probs
             model = load_model()
             probs_list = get_frame_probs(model, sortformer_path)
         finally:
             os.unlink(sortformer_path)
-        print(f"Truncated to first {max_sec}s")
     else:
-        from sortformer import load_model, get_frame_probs
+        from input_pipeline.sortformer import load_model, get_frame_probs
         model = load_model()
         probs_list = get_frame_probs(model, audio_path)
 
@@ -163,9 +162,9 @@ def run_real(audio_path=None, max_sec=None):
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--real", action="store_true", help="Use real Sortformer")
-    ap.add_argument("--audio", type=str, default=None, help="Audio path for --real")
-    ap.add_argument("--max-sec", type=float, default=None, help="Process only first N seconds")
+    ap.add_argument("--real", action="store_true")
+    ap.add_argument("--audio", type=str, default=None)
+    ap.add_argument("--max-sec", type=float, default=None)
     args = ap.parse_args()
 
     if args.real:

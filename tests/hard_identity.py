@@ -8,7 +8,7 @@ import torchaudio
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import config
-from ecapa import load_model
+from input_pipeline.ecapa import load_model
 
 
 def extract(model, path):

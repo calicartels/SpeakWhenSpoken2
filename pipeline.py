@@ -8,7 +8,7 @@ import torch
 import torchaudio
 
 import config
-import transcribe
+from input_pipeline import transcribe
 from VAP import orchestrate
 from VAP import vap
 
@@ -27,7 +27,7 @@ def load_or_compute_probs(audio_path):
         print(f"Loaded cached probs: {arr.shape}")
         return arr.tolist()
 
-    from sortformer import load_model, get_frame_probs
+    from input_pipeline.sortformer import load_model, get_frame_probs
     model = load_model()
     probs = get_frame_probs(model, audio_path)
     np.save(config.PROBS_CACHE_PATH, probs)
@@ -60,7 +60,7 @@ def run(audio_path=None, max_sec=None):
     segments = transcribe.extract_segments(probs)
     print(f"{len(segments)} segments")
 
-    from voxtral import load_model as load_voxtral
+    from input_pipeline.voxtral import load_model as load_voxtral
     model, proc = load_voxtral()
 
     t0 = time.time()

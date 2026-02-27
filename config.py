@@ -27,6 +27,7 @@ ADDRESS_BOOK_PATH = "state/address_book.pt"
 FIFTH_SPEAKER_THRESHOLD = 0.40
 
 PROBS_CACHE_PATH = "assets/sortformer_probs.npy"
+TRANSCRIPT_CACHE_PATH = "assets/transcript_cache.json"
 HIGH_OPENING_THRESHOLD = 0.75
 TRANSCRIPT_WINDOW_SEC = 5.0
 
@@ -38,3 +39,12 @@ GATE_SUPPRESS_SEC = 3.0
 SEGMENT_ACTIVE_THRESHOLD = 0.3
 SEGMENT_MERGE_GAP_FRAMES = 5
 SEGMENT_MIN_SEC = 0.5
+
+GLINER_MODEL = "urchade/gliner_medium-v2.1"
+ENTITY_LABELS = ["person", "company", "product", "topic", "date", "number", "action item", "decision"]
+ENTITY_THRESHOLD = 0.4
+
+DECISION_MODEL = "meta-llama/llama-4-scout"
+DECISION_USE_NITRO = True
+DECISION_MAX_TOKENS = 200
+DECISION_TEMPERATURE = 0.1
