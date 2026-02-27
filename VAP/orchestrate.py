@@ -1,5 +1,10 @@
+import sys
+import os
+
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
 from VAP import dyad
 from VAP import router
 from VAP import state
@@ -20,6 +25,7 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
     rtr = router.new_router(n_speakers)
     prev_dyad = None
     frame_log = []
+    high_openings = []
 
     print(f"Processing {n_frames} frames ({n_frames * FRAME_SEC:.1f}s)")
 
@@ -47,6 +53,15 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
             vap_out = vap.get_latest(vap_model, "ai_buffer")
             state.update_vap(meeting, vap_out)
 
+            if vap_out["ai_opening"] is not None and vap_out["ai_opening"] >= config.HIGH_OPENING_THRESHOLD:
+                active = [k for k, v in meeting["speakers"].items() if v["is_active"]]
+                high_openings.append({
+                    "timestamp": ts,
+                    "ai_opening": vap_out["ai_opening"],
+                    "active_speakers": active,
+                    "mode": dyad_out["mode"],
+                })
+
         frame_log.append({
             "frame": i,
             "timestamp": ts,
@@ -67,7 +82,8 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
     print(state.render_for_llm(meeting))
     print(_format_router_summary(rtr))
     print(_format_pair_summary(meeting))
-    return meeting, frame_log
+    print(f"\nHigh VAP openings: {len(high_openings)} moments above {config.HIGH_OPENING_THRESHOLD}")
+    return meeting, frame_log, high_openings
 
 
 def _format_frame_status(meeting, dyad_out):

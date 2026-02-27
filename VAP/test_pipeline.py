@@ -78,7 +78,7 @@ def run_mock(duration_sec=20.0, scenario="four_speakers"):
     probs = mock_probs(duration_sec, scenario)
     audio = mock_audio(probs)
     vap_model = vap.load_vap()
-    meeting, log = orchestrate.process_file(audio, 16000, probs, vap_model)
+    meeting, log, _ = orchestrate.process_file(audio, 16000, probs, vap_model)
     modes = {}
     for e in log:
         m = e["dyad_mode"]
