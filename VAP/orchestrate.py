@@ -39,12 +39,12 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
             state.increment_pair_turns(meeting, transition["from_pair"])
 
         router.feed_frame(rtr, frame_audio, probs, dyad_out, ts)
+        vap.push_frame(vap_model, frame_audio)
         state.update_speakers(meeting, probs, ts)
         state.update_dyad(meeting, dyad_out)
 
         if i % VAP_EVERY_N == 0 and i > 0:
-            ch1, ch2 = router.get_ai_audio(rtr)
-            vap_out = vap.predict_from_audio(vap_model, ch1, ch2, "ai_buffer")
+            vap_out = vap.get_latest(vap_model, "ai_buffer")
             state.update_vap(meeting, vap_out)
 
         frame_log.append({
