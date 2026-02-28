@@ -108,16 +108,28 @@
       <div class="metric"><span>dominant_prob:</span> <span id="domProb">-</span></div>
     </div>
 
-    <!-- Gate & LLM -->
+    <!-- Gate & Fauna -->
     <div class="card">
-      <h2>Gate & LLM</h2>
+      <h2>Gate & Fauna</h2>
       <div id="gateLog" class="log"></div>
+    </div>
+
+    <!-- Wake / Direct Response -->
+    <div class="card">
+      <h2>Fauna Response</h2>
+      <div id="wakeLog" class="log"></div>
     </div>
 
     <!-- Entities -->
     <div class="card">
       <h2>Entities</h2>
       <div id="entities"></div>
+    </div>
+
+    <!-- Knowledge Graph -->
+    <div class="card">
+      <h2>Knowledge Graph</h2>
+      <pre id="graphText" style="font-size: 10px; color: #8b949e; max-height: 150px; overflow: auto; white-space: pre-wrap; margin: 0;">(waiting for GLiNER cycle)</pre>
     </div>
 
     <!-- Transcript -->
@@ -268,16 +280,32 @@
       if (data.gate_open) {
         const g = data.gate_open;
         const log = document.getElementById('gateLog');
-        const dec = g.decision;
-        const tag = dec && dec.speak ? 'speak' : 'silent';
-        const reason = dec ? dec.reason : 'no decision';
         const line = document.createElement('div');
-        line.className = 'gate ' + tag;
-        line.textContent = `[${g.timestamp.toFixed(1)}s] ${g.reason} | ${dec && dec.speak ? 'SPEAK' : 'SILENT'}: ${reason}`;
+        if (g.decision) {
+          line.className = 'gate speak';
+          line.textContent = `[${g.timestamp.toFixed(1)}s] ${g.source}: ${g.decision}`;
+        } else {
+          line.className = 'gate silent';
+          line.textContent = `[${g.timestamp.toFixed(1)}s] gate fired, draft ${g.source} (vap=${g.ai_opening.toFixed(2)})`;
+        }
         log.appendChild(line);
         while (log.children.length > 50) log.removeChild(log.firstChild);
         log.scrollTop = log.scrollHeight;
-        dlog(`Gate: ${g.reason} vap=${g.ai_opening.toFixed(3)} mode=${g.mode}`);
+        dlog(`Gate: source=${g.source} vap=${g.ai_opening.toFixed(3)} mode=${g.mode}`);
+      }
+      if (data.wake_response) {
+        const wr = data.wake_response;
+        const log = document.getElementById('wakeLog');
+        const line = document.createElement('div');
+        line.className = 'gate speak';
+        line.textContent = `[${wr.timestamp.toFixed(1)}s] Fauna (${wr.source}): ${wr.text}`;
+        log.appendChild(line);
+        while (log.children.length > 50) log.removeChild(log.firstChild);
+        log.scrollTop = log.scrollHeight;
+        dlog(`Fauna wake: ${wr.source}`);
+      }
+      if (data.graph_text) {
+        document.getElementById('graphText').textContent = data.graph_text;
       }
       if (data.diarization) {
         dlog(`Diarization: ${data.diarization.n_frames} frames, probs=[${data.diarization.latest_probs.map(p => p.toFixed(2)).join(', ')}]`);

@@ -1,17 +1,23 @@
 import config
 
 
-def should_open(vap_opening, mode, dominant_prob):
+def should_open(vap_opening, mode, dominant_prob,
+                silence_gap_sec=0.0, turn_hold=0.0):
     if vap_opening is None:
         return False
-    if mode == "silence" and vap_opening >= config.GATE_THRESHOLD_SILENCE:
-        return True
-    if mode in ("solo", "dyad") and vap_opening >= config.GATE_THRESHOLD_SPEECH:
-        return True
-    if dominant_prob is not None and dominant_prob < config.GATE_FADE_PROB:
-        if vap_opening >= config.GATE_THRESHOLD_SILENCE:
-            return True
-    return False
+
+    signals = {
+        "silence_gap": min(silence_gap_sec / 2.0, 1.0),
+        "speaker_fading": (
+            max(0.0, 1.0 - dominant_prob / config.GATE_FADE_PROB)
+            if dominant_prob is not None else 0.0
+        ),
+        "prosodic_boundary": 1.0 - turn_hold,
+        "vap_score": vap_opening,
+    }
+
+    composite = sum(config.GATE_WEIGHTS[k] * signals[k] for k in config.GATE_WEIGHTS)
+    return composite >= config.GATE_THRESHOLD
 
 
 def deduplicate(openings):

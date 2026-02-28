@@ -29,5 +29,7 @@ maai>=0.1.0
 scipy>=1.10
 gliner>=0.2
 openai>=1.0
+httpx>=0.27
+supermemory>=3.4
 python-dotenv>=1.0
 websockets>=12
