@@ -1,5 +1,8 @@
 import time
 import uuid
+import logging
+
+log = logging.getLogger("graph")
 
 
 _RELATIONAL_LABELS = {
@@ -49,6 +52,7 @@ def add_relation(graph, src_label, src_type, tgt_label, tgt_type, relation, ts):
         "timestamp": ts, "meeting_id": graph["meeting_id"],
     })
     graph["version"] += 1
+    log.info(f"New Edge: {src_label} --{relation}--> {tgt_label}")
 
 
 def _add_relational(graph, label, text, ts):
@@ -68,6 +72,9 @@ def _add_relational(graph, label, text, ts):
 
 
 def ingest_gliner(graph, entities, ts):
+    if not entities:
+        return
+    log.debug(f"Ingesting {len(entities)} GLiNER entities")
     simple = []
     for ent in entities:
         if ent["label"].lower() in _RELATIONAL_LABELS:

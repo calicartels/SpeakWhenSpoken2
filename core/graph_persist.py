@@ -1,6 +1,8 @@
 import json
 import os
+import logging
 
+log = logging.getLogger("supermemory")
 _client = None
 
 
@@ -10,10 +12,16 @@ def _get_client():
         return _client
     key = os.environ.get("SUPERMEMORY_API_KEY", "")
     if not key:
+        log.warning("SUPERMEMORY_API_KEY not set - skipping Supermemory integration")
         return None
-    from supermemory import Supermemory
-    _client = Supermemory(api_key=key)
-    return _client
+    try:
+        from supermemory import Supermemory
+        _client = Supermemory(api_key=key)
+        log.info("Supermemory client initialized successfully")
+        return _client
+    except Exception as e:
+        log.error(f"Failed to initialize Supermemory client: {e}")
+        return None
 
 
 def persist_entity(graph, node_id, meeting_id, participants=None):
@@ -30,7 +38,11 @@ def persist_entity(graph, node_id, meeting_id, participants=None):
     meta = {"type": node["type"], "meeting_id": meeting_id}
     if participants:
         meta["participants"] = ",".join(str(p) for p in participants)
-    sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
+    try:
+        sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
+        log.info(f"Persisted entity to SM: {node['label']} [{node['type']}]")
+    except Exception as e:
+        log.error(f"SM persist_entity failed: {e}")
 
 
 def persist_edge(graph, edge, meeting_id, participants=None):
@@ -47,7 +59,11 @@ def persist_edge(graph, edge, meeting_id, participants=None):
     meta = {"relation": edge["relation"], "meeting_id": meeting_id}
     if participants:
         meta["participants"] = ",".join(str(p) for p in participants)
-    sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
+    try:
+        sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
+        log.info(f"Persisted edge to SM: {src.get('label')} --{edge['relation']}--> {tgt.get('label')}")
+    except Exception as e:
+        log.error(f"SM persist_edge failed: {e}")
 
 
 def persist_graph(graph, participants=None):
@@ -62,15 +78,20 @@ def search_past(query, limit=10):
     sm = _get_client()
     if sm is None:
         return []
-    results = sm.search.memories(q=query, search_mode="hybrid", limit=limit)
-    facts = []
-    for doc in (results.results or [])[:limit]:
-        content = getattr(doc, "memory", None) or getattr(doc, "chunk", None) or ""
-        try:
-            facts.append(json.loads(content))
-        except (json.JSONDecodeError, TypeError):
-            facts.append({"raw": str(content)})
-    return facts
+    try:
+        results = sm.search.memories(q=query, search_mode="hybrid", limit=limit)
+        facts = []
+        for doc in (results.results or [])[:limit]:
+            content = getattr(doc, "memory", None) or getattr(doc, "chunk", None) or ""
+            try:
+                facts.append(json.loads(content))
+            except (json.JSONDecodeError, TypeError):
+                facts.append({"raw": str(content)})
+        log.info(f"SM search for '{query}' returned {len(facts)} facts")
+        return facts
+    except Exception as e:
+        log.error(f"SM search failed: {e}")
+        return []
 
 
 def render_cross_meeting(facts):

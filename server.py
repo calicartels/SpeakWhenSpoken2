@@ -140,7 +140,8 @@ async def handle_client(websocket):
         async for message in websocket:
             try:
                 msg = json.loads(message)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                log.error(f"Failed to decode message: {e}")
                 continue
 
             if msg.get("type") == "log_subscribe":
@@ -162,6 +163,7 @@ async def handle_client(websocket):
             audio_buf = np.append(audio_buf, chunk)
             if len(audio_buf) > MAX_AUDIO_BUF_SEC * config.SAMPLE_RATE:
                 audio_buf = audio_buf[-MAX_AUDIO_BUF_SEC * config.SAMPLE_RATE:]
+            log.debug(f"Received audio chunk: {len(chunk)} samples")
 
             frame_count += 1
             ts = frame_count * FRAME_SEC
@@ -178,6 +180,7 @@ async def handle_client(websocket):
             if probs_frames:
                 last_probs = probs_frames[-1]
                 results["diarization"] = {"n_frames": len(probs_frames), "latest_probs": last_probs}
+                log.debug(f"Sortformer returned {len(probs_frames)} frames. Latest probs: {last_probs}")
 
             current_probs = last_probs
 
@@ -226,25 +229,31 @@ async def handle_client(websocket):
                 # Pre-warm Mercury 2 draft
                 if (vap_out["ai_opening"] >= config.PREWARM_THRESHOLD
                         and not draft_st["generating"] and draft_st["text"] is None):
+                    log.info(f"Pre-warming Mercury draft (VAP opening {vap_out['ai_opening']} >= {config.PREWARM_THRESHOLD})")
                     await _start_draft(draft_st, transcript_accum, mem_text, state_text, cross_text)
 
                 # Wake word path
                 if _check_wake(transcript_accum):
+                    log.info("Wake word detected!")
                     draft_text = _release_draft(draft_st)
                     if draft_text:
+                        log.info(f"Using pre-warmed draft for wake word: {draft_text}")
                         results["wake_response"] = {"text": draft_text, "source": "draft", "timestamp": ts}
                     else:
+                        log.info("No draft ready, calling Mercury directly for wake word response")
                         resp = await asyncio.to_thread(
                             decide.respond_direct, transcript_accum, mem_text, state_text, cross_text)
                         results["wake_response"] = {"text": resp, "source": "direct", "timestamp": ts}
 
-                # Gate path (weighted composite)
+                # Gate path (simplified)
                 elif gate.should_open(vap_out["ai_opening"], dyad_out["mode"],
                                       dom_prob, silence_sec, vap_out["turn_hold"]):
                     now = time.time()
                     if now - last_gate_time >= config.GATE_COOLDOWN_SEC:
+                        log.info(f"Gate opened via signal! VAP={vap_out['ai_opening']}, Silence={silence_sec}s")
                         last_gate_time = now
                         draft_text = _release_draft(draft_st)
+                        log.info(f"Gate response: {draft_text or 'stale draft'}")
                         results["gate_open"] = {
                             "timestamp": ts,
                             "ai_opening": vap_out["ai_opening"],
@@ -253,6 +262,8 @@ async def handle_client(websocket):
                             "decision": draft_text,
                             "source": "draft" if draft_text else "stale",
                         }
+                    else:
+                        log.debug("Gate signal fired but in cooldown.")
 
             # --- GLiNER + graph (every ~10s) ---
             if frame_count % GLINER_INTERVAL == 0 and transcript_accum:
