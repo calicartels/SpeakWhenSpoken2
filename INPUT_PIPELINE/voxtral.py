@@ -11,7 +11,7 @@ import config
 log = logging.getLogger("voxtral")
 
 VLLM_URL = f"ws://localhost:{config.VLLM_PORT}/v1/realtime"
-MAX_CONNECT_ATTEMPTS = 30
+MAX_CONNECT_ATTEMPTS = 60
 CONNECT_RETRY_SEC = 2
 
 
@@ -26,16 +26,17 @@ async def new_stream(_model=None, _proc=None):
     for attempt in range(MAX_CONNECT_ATTEMPTS):
         try:
             ws = await asyncio.wait_for(
-                websockets.connect(VLLM_URL), timeout=5
+                websockets.connect(VLLM_URL), timeout=15
             )
             break
-        except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
+        except Exception as e:
             if attempt < MAX_CONNECT_ATTEMPTS - 1:
-                log.info("vLLM not ready, retry %d/%d...", attempt + 1, MAX_CONNECT_ATTEMPTS)
+                log.info("vLLM not ready (attempt %d/%d): %s", attempt + 1, MAX_CONNECT_ATTEMPTS, e)
                 await asyncio.sleep(CONNECT_RETRY_SEC)
 
     if ws is None:
-        raise RuntimeError(f"Cannot connect to vLLM at {VLLM_URL}")
+        log.error(f"Cannot connect to vLLM at {VLLM_URL} after {MAX_CONNECT_ATTEMPTS} attempts")
+        return None
 
     response = json.loads(await ws.recv())
     if response.get("type") != "session.created":

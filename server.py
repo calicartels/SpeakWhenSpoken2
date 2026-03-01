@@ -134,6 +134,10 @@ async def handle_client(websocket):
     participants = set()
 
     vox_stream = await voxtral.new_stream(models["voxtral_model"], models["voxtral_proc"])
+    if vox_stream is None:
+        log.error(f"Cannot accept client: vLLM stream not created for meeting {kg['meeting_id']}")
+        await websocket.close(1011, "vLLM unavailable")
+        return
     slog(f"Client connected, meeting={kg['meeting_id']}")
 
     try:
@@ -175,7 +179,8 @@ async def handle_client(websocket):
                 slog(f"Frame {frame_count}, buf={len(audio_buf)/config.SAMPLE_RATE:.1f}s")
 
             # --- Streaming Sortformer ---
-            await voxtral.feed_audio(vox_stream, chunk)
+            if vox_stream:
+                await voxtral.feed_audio(vox_stream, chunk)
             probs_frames = sortformer.push_audio(models["sortformer"], chunk)
             if probs_frames:
                 last_probs = probs_frames[-1]
@@ -269,12 +274,12 @@ async def handle_client(websocket):
             if frame_count % GLINER_INTERVAL == 0 and transcript_accum:
                 combined = " ".join(t.get("text", "") for t in transcript_accum[-20:])
                 if len(combined.split()) >= GLINER_MIN_WORDS:
-                    entities = await asyncio.to_thread(memory.extract, models["gliner"], combined)
-                    if entities:
-                        for ent in entities:
+                    ents = await asyncio.to_thread(memory.extract, models["gliner"], combined)
+                    if ents:
+                        for ent in ents:
                             memory.update(mem_store, {"speaker": "live", "start": ts, "end": ts}, [ent])
-                        graph.ingest_gliner(kg, entities, ts)
-                        results["entities"] = [{"text": e["text"], "label": e["label"], "score": e["score"]} for e in entities]
+                        graph.ingest_gliner(kg, ents, ts)
+                        results["entities"] = [{"text": e["text"], "label": e["label"], "score": e["score"]} for e in ents]
 
                         if config.SUPERMEMORY_ENABLED:
                             await asyncio.to_thread(graph_persist.persist_graph, kg, list(participants))
