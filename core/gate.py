@@ -3,21 +3,24 @@ import config
 
 def should_open(vap_opening, mode, dominant_prob,
                 silence_gap_sec=0.0, turn_hold=0.0):
+    """Simplified gate: VAP + silence threshold.
+
+    Opens if:
+      - VAP opening >= threshold AND silence >= min silence
+      - OR silence alone >= force-open threshold (long pause)
+    """
     if vap_opening is None:
         return False
 
-    signals = {
-        "silence_gap": min(silence_gap_sec / 2.0, 1.0),
-        "speaker_fading": (
-            max(0.0, 1.0 - dominant_prob / config.GATE_FADE_PROB)
-            if dominant_prob is not None else 0.0
-        ),
-        "prosodic_boundary": 1.0 - turn_hold,
-        "vap_score": vap_opening,
-    }
+    # Long silence always opens (someone should speak)
+    if silence_gap_sec >= config.GATE_SILENCE_FORCE:
+        return True
 
-    composite = sum(config.GATE_WEIGHTS[k] * signals[k] for k in config.GATE_WEIGHTS)
-    return composite >= config.GATE_THRESHOLD
+    # VAP says AI should speak AND there's a natural gap
+    if vap_opening >= config.GATE_THRESHOLD and silence_gap_sec >= config.GATE_SILENCE_MIN:
+        return True
+
+    return False
 
 
 def deduplicate(openings):
@@ -36,10 +39,10 @@ def deduplicate(openings):
 def filter_openings(openings):
     deduped = deduplicate(openings)
     for ho in deduped:
-        if ho["mode"] == "silence":
+        if ho.get("silence_gap_sec", 0) >= config.GATE_SILENCE_FORCE:
+            ho["reason"] = "long_silence"
+        elif ho.get("mode") == "silence":
             ho["reason"] = "silence_gap"
-        elif ho.get("dominant_prob") is not None and ho["dominant_prob"] < config.GATE_FADE_PROB:
-            ho["reason"] = "speaker_fading"
         else:
-            ho["reason"] = "prosodic_boundary"
+            ho["reason"] = "vap_opening"
     return deduped

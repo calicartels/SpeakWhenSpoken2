@@ -1,7 +1,15 @@
 import os
+import logging
 import httpx
 import config
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+log = logging.getLogger("decide")
 _client = httpx.Client(timeout=10.0)
 _api_key = os.environ.get("MERCURY_API_KEY", "")
 
@@ -81,18 +89,25 @@ def respond_direct(transcript, memory_text, meeting_state, cross_meeting_text=""
 
 
 def _call_mercury(system, user_content):
-    resp = _client.post(
-        config.MERCURY_API_URL,
-        headers={"Authorization": f"Bearer {_api_key}", "Content-Type": "application/json"},
-        json={
-            "model": config.MERCURY_MODEL,
-            "max_tokens": 150,
-            "temperature": 0.7,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_content},
-            ],
-        },
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    if not _api_key:
+        log.warning("MERCURY_API_KEY not set — returning SILENT")
+        return "SILENT"
+    try:
+        resp = _client.post(
+            config.MERCURY_API_URL,
+            headers={"Authorization": f"Bearer {_api_key}", "Content-Type": "application/json"},
+            json={
+                "model": config.MERCURY_MODEL,
+                "max_tokens": 150,
+                "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_content},
+                ],
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        log.error(f"Mercury call failed: {e}")
+        return "SILENT"

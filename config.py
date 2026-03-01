@@ -28,17 +28,12 @@ ENTITY_LABELS = [
 ]
 ENTITY_THRESHOLD = 0.4
 
-# Gate (weighted composite scoring)
-GATE_WEIGHTS = {
-    "silence_gap": 0.35,
-    "speaker_fading": 0.30,
-    "prosodic_boundary": 0.20,
-    "vap_score": 0.15,
-}
-GATE_THRESHOLD = 0.55
-GATE_FADE_PROB = 0.5
-GATE_SUPPRESS_SEC = 3.0
-GATE_COOLDOWN_SEC = 5.0
+# Gate (simplified: VAP + silence)
+GATE_THRESHOLD = 0.35          # VAP opening score to consider speaking
+GATE_SILENCE_MIN = 1.5         # minimum silence gap (sec) before gate can open
+GATE_SILENCE_FORCE = 3.0       # force gate open after this much silence
+GATE_SUPPRESS_SEC = 3.0        # suppress duplicate gates within this window
+GATE_COOLDOWN_SEC = 5.0        # minimum seconds between gate openings
 
 # Mercury 2 (Inception Labs diffusion LLM)
 MERCURY_API_URL = "https://api.inceptionlabs.ai/v1/chat/completions"
