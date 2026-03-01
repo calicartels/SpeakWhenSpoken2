@@ -229,6 +229,13 @@ async def handle_client(websocket):
                     "speaker_probs": current_probs,
                     "silence_gap_sec": silence_sec,
                 }
+                
+                # Expose live draft and generation state to the frontend
+                results["live_draft"] = {
+                    "text": draft_st["text"],
+                    "generating": draft_st["generating"]
+                }
+                
                 state_text = state.render_for_llm(meeting)
 
                 # Pre-warm Mercury 2 draft
@@ -257,16 +264,30 @@ async def handle_client(websocket):
                     if now - last_gate_time >= config.GATE_COOLDOWN_SEC:
                         log.info(f"Gate opened via signal! VAP={vap_out['ai_opening']}, Silence={silence_sec}s")
                         last_gate_time = now
-                        draft_text = _release_draft(draft_st)
-                        log.info(f"Gate response: {draft_text or 'stale draft'}")
-                        results["gate_open"] = {
-                            "timestamp": ts,
-                            "ai_opening": vap_out["ai_opening"],
-                            "mode": dyad_out["mode"],
-                            "active_speakers": results["state"]["active_speakers"],
-                            "decision": draft_text,
-                            "source": "draft" if draft_text else "stale",
-                        }
+                        draft_text = None
+                        if draft_st["generating"] and draft_st["task"]:
+                            log.info("Gate opened but draft is still generating. Awaiting HTTP response...")
+                            await draft_st["task"]
+                            draft_text = _release_draft(draft_st)
+                        else:
+                            draft_text = _release_draft(draft_st)
+                            if not draft_text:
+                                log.info("No pre-warmed draft available. Fetching JIT response from Mercury...")
+                                draft_text = await asyncio.to_thread(
+                                    decide.draft, transcript_accum, mem_text, state_text, cross_text)
+                                if draft_text == "SILENT":
+                                    draft_text = None
+
+                        log.info(f"Gate response: {draft_text or 'SILENT / stale'}")
+                        if draft_text:
+                            results["gate_open"] = {
+                                "timestamp": ts,
+                                "ai_opening": vap_out["ai_opening"],
+                                "mode": dyad_out["mode"],
+                                "active_speakers": results["state"]["active_speakers"],
+                                "decision": draft_text,
+                                "source": "draft",
+                            }
                     else:
                         log.debug("Gate signal fired but in cooldown.")
 

@@ -1,0 +1,82 @@
+.fauna-chat {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+.fauna-chat--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  gap: 8px;
+}
+.fauna-chat__avatar {
+  font-size: 28px;
+  opacity: 0.4;
+}
+.fauna-chat__placeholder {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.fauna-chat__bubble {
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  animation: slide-in-right 0.3s ease both;
+  box-shadow: var(--shadow-card);
+}
+.fauna-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.fauna-chat__avatar-sm {
+  font-size: 14px;
+}
+.fauna-chat__tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}
+.fauna-chat__tag--draft {
+  background: var(--accent-indigo-dim);
+  color: var(--accent-indigo);
+}
+.fauna-chat__tag--direct {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+}
+.fauna-chat__tag--wake {
+  background: var(--accent-amber-dim);
+  color: var(--accent-amber);
+}
+.fauna-chat__tag--stale {
+  background: var(--accent-red-dim);
+  color: var(--accent-red);
+}
+.fauna-chat__ts {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.fauna-chat__text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.fauna-chat__meta {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}

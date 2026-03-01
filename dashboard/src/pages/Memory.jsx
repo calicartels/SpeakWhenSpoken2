@@ -22,7 +22,7 @@ export default function Memory({ smApiKey, smGraphData, activeMeeting, setActive
           <p className="page-subtitle">Interactive persistent knowledge graph backed by Supermemory</p>
         </header>
 
-        <section className="card card--graph" style={{ flex: 1, minHeight: 0 }}>
+        <section className="card" style={{ flex: 1, minHeight: 0 }}>
           <KnowledgeGraph graphData={graphText} supermemoryData={smGraphData} />
         </section>
       </div>

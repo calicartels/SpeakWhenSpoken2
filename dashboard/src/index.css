@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafafa;
+  --bg-glass: rgba(255, 255, 255, 0.9);
+  --bg-input: #f7f9fa;
+
+  --border: #f0f0f0;
+  --border-active: #e5e7eb;
+
+  --text-primary: #111111;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --text-accent: #dd5e4a;
+
+  --speaker-0: #60a5fa;
+  --speaker-1: #34d399;
+  --speaker-2: #fbbf24;
+  --speaker-3: #f472b6;
+
+  --accent-indigo: #111111;
+  --accent-indigo-dim: rgba(17, 17, 17, 0.05);
+  --accent-green: #10b981;
+  --accent-green-dim: rgba(16, 185, 129, 0.08);
+  --accent-amber: #f59e0b;
+  --accent-amber-dim: rgba(245, 158, 11, 0.08);
+  --accent-red: #dd5e4a;
+  --accent-red-dim: rgba(221, 94, 74, 0.08);
+  --accent-cyan: #06b6d4;
+
+  --gauge-bg: #f3f4f6;
+  --gauge-track: #e5e7eb;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.03);
+  --shadow-glow-indigo: 0 4px 14px rgba(17, 17, 17, 0.08);
+  --shadow-glow-green: 0 4px 14px rgba(16, 185, 129, 0.15);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, .page-title, .layout__title {
+  font-family: 'Outfit', sans-serif;
+}
+
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(34, 197, 94, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+}
+@keyframes gate-flash {
+  0% { background: var(--accent-indigo-dim); }
+  50% { background: rgba(99, 102, 241, 0.35); }
+  100% { background: var(--accent-indigo-dim); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}

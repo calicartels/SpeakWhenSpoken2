@@ -1,23 +1,14 @@
 import config
 
 
-def should_open(vap_opening, mode, dominant_prob,
-                silence_gap_sec=0.0, turn_hold=0.0):
-    """Simplified gate: VAP + silence threshold.
-
-    Opens if:
-      - VAP opening >= threshold AND silence >= min silence
-      - OR silence alone >= force-open threshold (long pause)
-    """
+def should_open(vap_opening, mode, dominant_prob, silence_gap_sec=0.0, turn_hold=0.0):
     if vap_opening is None:
         return False
 
-    # Long silence always opens (someone should speak)
-    if silence_gap_sec >= config.GATE_SILENCE_FORCE:
+    if vap_opening >= config.GATE_THRESHOLD:
         return True
 
-    # VAP says AI should speak AND there's a natural gap
-    if vap_opening >= config.GATE_THRESHOLD and silence_gap_sec >= config.GATE_SILENCE_MIN:
+    if silence_gap_sec >= config.GATE_SILENCE_FORCE:
         return True
 
     return False

@@ -31,16 +31,20 @@ def persist_entity(graph, node_id, meeting_id, participants=None):
     node = graph["nodes"].get(node_id)
     if not node:
         return
-    content = json.dumps({
-        "label": node["label"], "type": node["type"],
-        "mentions": node["mentions"], "meeting_id": meeting_id,
-    })
-    meta = {"type": node["type"], "meeting_id": meeting_id}
+        
+    label = node["label"]
+    ntype = node["type"]
+    
+    # Generate Semantic Natural Language Sentence for Entities
+    content = f"[Meeting {meeting_id}] Participants discussed {label}, which is a {ntype}."
+    
+    meta = {"type": ntype, "meeting_id": meeting_id, "is_entity": "true"}
     if participants:
         meta["participants"] = ",".join(str(p) for p in participants)
+        
     try:
         sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
-        log.info(f"Persisted entity to SM: {node['label']} [{node['type']}]")
+        log.info(f"Persisted entity to SM: '{content}'")
     except Exception as e:
         log.error(f"SM persist_entity failed: {e}")
 
@@ -51,17 +55,21 @@ def persist_edge(graph, edge, meeting_id, participants=None):
         return
     src = graph["nodes"].get(edge["source"], {})
     tgt = graph["nodes"].get(edge["target"], {})
-    content = json.dumps({
-        "source": src.get("label", "?"), "source_type": src.get("type", "?"),
-        "target": tgt.get("label", "?"), "target_type": tgt.get("type", "?"),
-        "relation": edge["relation"], "meeting_id": meeting_id,
-    })
-    meta = {"relation": edge["relation"], "meeting_id": meeting_id}
+    
+    src_label = src.get("label", "Unknown")
+    tgt_label = tgt.get("label", "Unknown")
+    relation = edge["relation"]
+    
+    # Generate Semantic Natural Language Sentence for Edges
+    content = f"[Meeting {meeting_id}] {src_label} {relation} {tgt_label}."
+    
+    meta = {"relation": relation, "meeting_id": meeting_id, "is_edge": "true"}
     if participants:
         meta["participants"] = ",".join(str(p) for p in participants)
+        
     try:
         sm.documents.add(content=content, container_tag=meeting_id, metadata=meta)
-        log.info(f"Persisted edge to SM: {src.get('label')} --{edge['relation']}--> {tgt.get('label')}")
+        log.info(f"Persisted edge to SM: '{content}'")
     except Exception as e:
         log.error(f"SM persist_edge failed: {e}")
 
@@ -83,10 +91,8 @@ def search_past(query, limit=10):
         facts = []
         for doc in (results.results or [])[:limit]:
             content = getattr(doc, "memory", None) or getattr(doc, "chunk", None) or ""
-            try:
-                facts.append(json.loads(content))
-            except (json.JSONDecodeError, TypeError):
-                facts.append({"raw": str(content)})
+            # Because memories are now natural language, just append the string directly
+            facts.append({"raw": str(content)})
         log.info(f"SM search for '{query}' returned {len(facts)} facts")
         return facts
     except Exception as e:
@@ -99,16 +105,5 @@ def render_cross_meeting(facts):
         return ""
     lines = ["CROSS-MEETING CONTEXT (from past meetings):"]
     for f in facts:
-        if "relation" in f:
-            lines.append(
-                f"  - {f.get('source','?')} --{f['relation']}--> "
-                f"{f.get('target','?')} (from {f.get('meeting_id','?')})"
-            )
-        elif "label" in f:
-            lines.append(
-                f"  - [{f.get('type','?')}] {f['label']} "
-                f"(from {f.get('meeting_id','?')})"
-            )
-        else:
-            lines.append(f"  - {f}")
+        lines.append(f"  - {f.get('raw', str(f))}")
     return "\n".join(lines)

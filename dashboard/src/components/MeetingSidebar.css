@@ -1,0 +1,102 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+  padding: 1.5rem 1rem;
+  gap: 24px;
+}
+.sidebar__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar__logo {
+  font-size: 24px;
+}
+.sidebar__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  font-family: 'Outfit', sans-serif;
+}
+.sidebar__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar__section-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.sidebar__meeting {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  border: 1px solid transparent;
+}
+.sidebar__meeting:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+.sidebar__meeting.active {
+  background: var(--bg-button, #dd5e4a);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(221, 94, 74, 0.2);
+}
+.sidebar__meeting-name {
+  font-weight: 500;
+}
+.sidebar__meeting-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.sidebar__loading {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px;
+}
+.sidebar__status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+.sidebar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.sidebar__dot.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+.sidebar__dot.disconnected {
+  background: var(--accent-red);
+}
+.sidebar__status-text {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sidebar__footer {
+  margin-top: auto;
+}
+.sidebar__version {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}

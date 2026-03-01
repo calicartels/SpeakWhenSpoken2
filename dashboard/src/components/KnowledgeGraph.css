@@ -1,0 +1,50 @@
+.kg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+.kg__tabs {
+  display: flex;
+  gap: 4px;
+}
+.kg__tab {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.kg__tab.active {
+  background: var(--accent-indigo-dim);
+  border-color: var(--accent-indigo);
+  color: var(--accent-indigo);
+}
+.kg__svg {
+  flex: 1;
+  min-height: 240px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.kg__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.kg__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.kg__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}

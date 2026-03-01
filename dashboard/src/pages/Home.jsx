@@ -1,16 +1,19 @@
 import { useOutletContext } from 'react-router-dom';
-import VideoInput from '../components/VideoInput';
 import SpeakerWaveforms from '../components/SpeakerWaveforms';
 import Transcript from '../components/Transcript';
+import VapGauges from '../components/VapGauges';
+import FaunaChat from '../components/FaunaChat';
 
 export default function Home() {
   const {
-    active,
-    source,
     probs,
     transcript,
-    handleVideoElement,
-    frameDataRef
+    frameDataRef,
+    vap,
+    stateData,
+    gateOpen,
+    faunaMessages,
+    liveDraft
   } = useOutletContext();
 
   return (
@@ -21,25 +24,34 @@ export default function Home() {
       </header>
 
       <div className="app__grid">
-        <section className="card card--video">
-          <h2 className="card__title">Video / Audio Input</h2>
-          <VideoInput onVideoElement={handleVideoElement} active={active && source === 'video'} />
-        </section>
+        <div className="col-span-1" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <section className="card">
+            <h2 className="card__title">Speaker Waveforms</h2>
+            <SpeakerWaveforms probs={probs} frameData={frameDataRef} />
+          </section>
 
-        <section className="card card--waveforms">
-          <h2 className="card__title">Speaker Waveforms</h2>
-          <SpeakerWaveforms probs={probs} frameData={frameDataRef} />
-        </section>
+          <section className="card" style={{ flex: 1 }}>
+            <h2 className="card__title">
+              Live Transcript
+              {transcript.length > 0 && (
+                <span className="card__badge">{transcript.length}</span>
+              )}
+            </h2>
+            <Transcript segments={transcript} />
+          </section>
+        </div>
 
-        <section className="card card--transcript" style={{ gridColumn: '1 / -1' }}>
-          <h2 className="card__title">
-            Live Transcript
-            {transcript.length > 0 && (
-              <span className="card__badge">{transcript.length}</span>
-            )}
-          </h2>
-          <Transcript segments={transcript} />
-        </section>
+        <div className="col-span-1" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <section className="card">
+            <h2 className="card__title">VAP & Gate</h2>
+            <VapGauges vap={vap} state={stateData} gateOpen={gateOpen} />
+          </section>
+
+          <section className="card" style={{ flex: 1 }}>
+            <h2 className="card__title">AI Responses</h2>
+            <FaunaChat messages={faunaMessages} liveDraft={liveDraft} />
+          </section>
+        </div>
       </div>
     </div>
   );

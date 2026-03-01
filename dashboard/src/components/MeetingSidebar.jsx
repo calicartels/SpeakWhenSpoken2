@@ -32,7 +32,6 @@ export default function MeetingSidebar({ apiKey, activeMeeting, onSelectMeeting,
   const fetchGraphData = useCallback(async (containerTag) => {
     if (!apiKey) return;
     try {
-      // Get bounds
       const boundsUrl = `${SM_API}/v3/graph/bounds${
         containerTag && containerTag !== 'all' ? `?containerTags=${containerTag}` : ''
       }`;
@@ -44,7 +43,6 @@ export default function MeetingSidebar({ apiKey, activeMeeting, onSelectMeeting,
       const bounds = boundsData?.bounds;
       if (!bounds) return;
 
-      // Get viewport data
       const vpRes = await fetch(`${SM_API}/v3/graph/viewport`, {
         method: 'POST',
         headers: {

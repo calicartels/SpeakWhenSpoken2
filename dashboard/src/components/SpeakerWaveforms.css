@@ -1,0 +1,30 @@
+.waveforms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.waveforms__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.waveforms__label {
+  font-size: 11px;
+  font-weight: 600;
+  width: 52px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.waveforms__prob {
+  font-size: 9px;
+  opacity: 0.6;
+  font-weight: 400;
+}
+.waveforms__canvas {
+  flex: 1;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}

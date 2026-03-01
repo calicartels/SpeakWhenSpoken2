@@ -1,8 +1,12 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutGrid, Cpu, BookOpen, Activity } from 'lucide-react';
+import VideoInput from './VideoInput';
 import './Layout.css';
 
-export default function Layout({ connected, apiKey }) {
+export default function Layout({ connected, apiKey, context }) {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
   return (
     <div className="layout">
       <aside className="layout__sidebar">
@@ -15,10 +19,6 @@ export default function Layout({ connected, apiKey }) {
           <NavLink to="/" className={({ isActive }) => `layout__link ${isActive ? 'active' : ''}`}>
             <LayoutGrid size={20} />
             Studio
-          </NavLink>
-          <NavLink to="/intelligence" className={({ isActive }) => `layout__link ${isActive ? 'active' : ''}`}>
-            <Cpu size={20} />
-            Intelligence
           </NavLink>
           <NavLink to="/memory" className={({ isActive }) => `layout__link ${isActive ? 'active' : ''}`}>
             <BookOpen size={20} />
@@ -44,7 +44,13 @@ export default function Layout({ connected, apiKey }) {
       </aside>
 
       <main className="layout__main">
-        <Outlet />
+        <div style={{ display: isHome ? 'block' : 'none', marginBottom: '1.5rem' }}>
+          <section className="card">
+            <h2 className="card__title">Video / Audio Input</h2>
+            <VideoInput onVideoElement={context.handleVideoElement} active={context.active && context.source === 'video'} />
+          </section>
+        </div>
+        <Outlet context={context} />
       </main>
     </div>
   );
