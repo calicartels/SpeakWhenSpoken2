@@ -29,7 +29,7 @@ ENTITY_LABELS = [
 ENTITY_THRESHOLD = 0.4
 
 # Gate (simplified: VAP + silence)
-GATE_THRESHOLD = 0.35          # VAP opening score to consider speaking
+GATE_THRESHOLD = 0.70          # VAP opening score to consider speaking
 GATE_SILENCE_MIN = 1.5         # minimum silence gap (sec) before gate can open
 GATE_SILENCE_FORCE = 3.0       # force gate open after this much silence
 GATE_SUPPRESS_SEC = 3.0        # suppress duplicate gates within this window
