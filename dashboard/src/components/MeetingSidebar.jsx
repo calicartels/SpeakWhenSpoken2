@@ -11,7 +11,6 @@ export default function MeetingSidebar({ apiKey, activeMeeting, onSelectMeeting,
     if (!apiKey) return;
     setLoading(true);
     try {
-    try {
       const res = await fetch(`${SM_API}/v3/graph/stats`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
