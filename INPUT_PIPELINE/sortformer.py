@@ -1,13 +1,5 @@
-"""Streaming Sortformer diarization — frame-by-frame, no batching.
-
-Adapted from NVIDIA NeMo's streaming diarizer:
-https://github.com/NVIDIA-NeMo/NeMo/blob/main/nemo/agents/voice_agent/pipecat/services/nemo/streaming_diar.py
-
-The diarizer processes each incoming audio chunk (~0.08-0.13s) through
-a sliding feature buffer + the Sortformer forward_streaming_step, returning
-per-frame speaker probabilities with sub-second latency.
-"""
 import math
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -152,7 +144,6 @@ class _StreamDiarizer:
         )
 
     def push(self, audio_f32):
-        """Push float32 audio samples, return [chunk_len, max_spk] probs."""
         self.feat_buf.update(audio_f32)
         feats = self.feat_buf.get().unsqueeze(0).transpose(1, 2)
         feat_len = torch.tensor([feats.shape[1]], device=self.device)
@@ -177,7 +168,6 @@ class _StreamDiarizer:
         self.total_preds = torch.zeros((1, 0, self.max_spk), device=self.device)
 
 
-# --- Public API ---
 
 def load_model():
     cfg = _Cfg()
@@ -186,7 +176,6 @@ def load_model():
 
 
 def push_audio(diarizer, samples_f32):
-    """Push audio chunk, get back list of [4] prob arrays (one per frame)."""
     result = diarizer.push(samples_f32)
     return [list(result[t]) for t in range(result.shape[0])]
 

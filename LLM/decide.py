@@ -43,7 +43,7 @@ Respond with JSON only:
 {"speak": true/false, "response": "what you'd say (empty if silent)", "reason": "why"}"""
 
 
-def _client():
+def get_client():
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("Set OPENROUTER_API_KEY env var (get one at openrouter.ai/keys)")
@@ -80,7 +80,7 @@ def decide(state_str, transcript_context, memory_str, opening):
     if config.DECISION_USE_NITRO:
         model = f"{model}:nitro"
 
-    client = _client()
+    client = get_client()
     response = client.chat.completions.create(
         model=model,
         max_tokens=config.DECISION_MAX_TOKENS,

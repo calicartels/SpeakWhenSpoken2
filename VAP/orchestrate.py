@@ -81,7 +81,7 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
         })
 
         if i > 0 and i % PRINT_EVERY_N == 0:
-            print(_format_frame_status(meeting, dyad_out))
+            print(format_frame_status(meeting, dyad_out))
 
         prev_dyad = dyad_out
 
@@ -90,14 +90,14 @@ def process_file(audio, sample_rate, probs_sequence, vap_model):
 
     print(f"\n{'=' * 60}\nFINAL STATE\n{'=' * 60}")
     print(state.render_for_llm(meeting))
-    print(_format_router_summary(rtr))
-    print(_format_pair_summary(meeting))
+    print(format_router_summary(rtr))
+    print(format_pair_summary(meeting))
     print(f"\nVAP openings: {len(high_openings)} gated ({raw_count} raw, "
           f"suppress={config.GATE_SUPPRESS_SEC}s)")
     return meeting, frame_log, high_openings
 
 
-def _format_frame_status(meeting, dyad_out):
+def format_frame_status(meeting, dyad_out):
     t = meeting["timestamp"]
     mode = dyad_out["mode"]
     dom = dyad_out["dominant"]
@@ -108,7 +108,7 @@ def _format_frame_status(meeting, dyad_out):
     return f"  [{t:6.2f}s] {mode:7s} dom={dom} active=[{active_str}] vap_open={ai:.2f} hold={hold:.2f}"
 
 
-def _format_router_summary(rtr):
+def format_router_summary(rtr):
     lines = ["\nRouter status:"]
     for key, val in router.get_router_status(rtr).items():
         if val["total_frames"] > 0:
@@ -116,7 +116,7 @@ def _format_router_summary(rtr):
     return "\n".join(lines)
 
 
-def _format_pair_summary(meeting):
+def format_pair_summary(meeting):
     lines = ["\nPair history:"]
     for pair, ph in sorted(meeting["pair_history"].items()):
         if ph["total_sec"] > 0:

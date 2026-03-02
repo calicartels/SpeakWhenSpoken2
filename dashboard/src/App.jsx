@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAudioStream } from './hooks/useAudioStream';
+import { useAudioPlayback } from './hooks/useAudioPlayback';
 
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -16,6 +17,7 @@ export default function App() {
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS);
   const { connected, lastMessage, connect, disconnect, send } = useWebSocket(wsUrl);
   const { active, source, startMic, startVideo, stop, frameDataRef } = useAudioStream(send);
+  const { play: playTTS } = useAudioPlayback();
 
   const [probs, setProbs] = useState([0, 0, 0, 0]);
   const [vap, setVap] = useState(null);
@@ -76,6 +78,9 @@ export default function App() {
           mode: g.mode,
         }]);
       }
+      if (g.tts_audio) {
+        playTTS(g.tts_audio);
+      }
     }
     if (msg.wake_response) {
       setFaunaMessages(prev => [...prev, {
@@ -83,6 +88,9 @@ export default function App() {
         source: msg.wake_response.source || 'wake',
         timestamp: msg.wake_response.timestamp,
       }]);
+      if (msg.wake_response.tts_audio) {
+        playTTS(msg.wake_response.tts_audio);
+      }
     }
     if (msg.graph_text) {
       setGraphText(msg.graph_text);

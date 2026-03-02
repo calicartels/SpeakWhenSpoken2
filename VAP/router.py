@@ -29,7 +29,7 @@ def new_router(n_speakers=4):
     }
 
 
-def _append_ring(ring, ch1_frame, ch2_frame):
+def append_ring(ring, ch1_frame, ch2_frame):
     n = len(ch1_frame)
     pos = ring["write_pos"]
     buf_len = len(ring["ch1"])
@@ -46,7 +46,7 @@ def _append_ring(ring, ch1_frame, ch2_frame):
     ring["total_frames"] += 1
 
 
-def _read_ring(ring):
+def read_ring(ring):
     pos = ring["write_pos"]
     return np.roll(ring["ch1"], -pos), np.roll(ring["ch2"], -pos)
 
@@ -55,7 +55,7 @@ def feed_frame(router, audio_frame, probs, dyad_out, timestamp):
     n = min(len(audio_frame), FRAME_SAMPLES)
     frame = audio_frame[:n]
     ai = router["ai_buffer"]
-    _append_ring(ai, frame, np.zeros(n, dtype=np.float32))
+    append_ring(ai, frame, np.zeros(n, dtype=np.float32))
     ai["last_active"] = timestamp
     ai["total_active_sec"] += 0.08
 
@@ -66,7 +66,7 @@ def feed_frame(router, audio_frame, probs, dyad_out, timestamp):
             ring = router["pair_buffers"][pair]
             ch1 = frame * probs[pair[0]]
             ch2 = frame * probs[pair[1]]
-            _append_ring(ring, ch1, ch2)
+            append_ring(ring, ch1, ch2)
             ring["last_active"] = timestamp
             ring["total_active_sec"] += 0.08
             fed_pair = pair
@@ -79,7 +79,7 @@ def feed_frame(router, audio_frame, probs, dyad_out, timestamp):
                         ch1, ch2 = frame * probs[dom], np.zeros(n, dtype=np.float32)
                     else:
                         ch1, ch2 = np.zeros(n, dtype=np.float32), frame * probs[dom]
-                    _append_ring(ring, ch1, ch2)
+                    append_ring(ring, ch1, ch2)
                     ring["last_active"] = timestamp
 
     router["last_fed"] = fed_pair
@@ -87,7 +87,7 @@ def feed_frame(router, audio_frame, probs, dyad_out, timestamp):
 
 
 def get_ai_audio(router):
-    return _read_ring(router["ai_buffer"])
+    return read_ring(router["ai_buffer"])
 
 
 def get_router_status(router):

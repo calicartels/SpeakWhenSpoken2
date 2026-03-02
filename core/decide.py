@@ -3,15 +3,12 @@ import logging
 import httpx
 import config
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from dotenv import load_dotenv
+load_dotenv()
 
 log = logging.getLogger("decide")
-_client = httpx.Client(timeout=10.0)
-_api_key = os.environ.get("MERCURY_API_KEY", "")
+client = httpx.Client(timeout=10.0)
+api_key = os.environ.get("MERCURY_API_KEY", "")
 
 SYSTEM_DRAFT = (
     "You are an AI meeting participant named Fauna. You are always listening.\n\n"
@@ -38,7 +35,7 @@ SYSTEM_DIRECT = (
 )
 
 
-def _classify_speech_act(text):
+def classify_speech_act(text):
     lower = text.lower().strip()
     if any(q in lower for q in ["?", "what do you", "can you", "could you",
                                  "do you think", "how about", "should we"]):
@@ -61,7 +58,7 @@ def build_context(transcript, memory_text, meeting_state, cross_meeting_text="")
     transcript_block = "\n".join(lines) if lines else "(no transcript yet)"
 
     last_text = recent[-1].get("text", "") if recent else ""
-    speech_act = _classify_speech_act(last_text)
+    speech_act = classify_speech_act(last_text)
     last_speaker = recent[-1].get("speaker", "UNKNOWN") if recent else "UNKNOWN"
 
     ctx = (
@@ -77,37 +74,32 @@ def build_context(transcript, memory_text, meeting_state, cross_meeting_text="")
 
 def draft(transcript, memory_text, meeting_state, cross_meeting_text=""):
     context = build_context(transcript, memory_text, meeting_state, cross_meeting_text)
-    return _call_mercury(SYSTEM_DRAFT, context)
+    return call_mercury(SYSTEM_DRAFT, context)
 
 
 def respond_direct(transcript, memory_text, meeting_state, cross_meeting_text=""):
     context = build_context(transcript, memory_text, meeting_state, cross_meeting_text)
-    resp = _call_mercury(SYSTEM_DIRECT, context)
+    resp = call_mercury(SYSTEM_DIRECT, context)
     if resp == "SILENT":
         return "I'm here -- could you repeat that?"
     return resp
 
 
-def _call_mercury(system, user_content):
-    if not _api_key:
-        log.warning("MERCURY_API_KEY not set — returning SILENT")
+def call_mercury(system, user_content):
+    if not api_key:
         return "SILENT"
-    try:
-        resp = _client.post(
-            config.MERCURY_API_URL,
-            headers={"Authorization": f"Bearer {_api_key}", "Content-Type": "application/json"},
-            json={
-                "model": config.MERCURY_MODEL,
-                "max_tokens": 150,
-                "temperature": 0.7,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_content},
-                ],
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        log.error(f"Mercury call failed: {e}")
-        return "SILENT"
+    resp = client.post(
+        config.MERCURY_API_URL,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": config.MERCURY_MODEL,
+            "max_tokens": 150,
+            "temperature": 0.7,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_content},
+            ],
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()

@@ -5,18 +5,15 @@ import base64
 import logging
 import time
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from dotenv import load_dotenv
+load_dotenv()
 
 import numpy as np
 import websockets
 from websockets.exceptions import ConnectionClosed
 
 import config
-from core import gate, graph, graph_persist, decide
+from core import gate, graph, graph_persist, decide, tts
 from INPUT_PIPELINE import sortformer, voxtral
 from VAP import vap, dyad, state, router
 from LLM import memory
@@ -53,13 +50,12 @@ def load_all():
     slog("All models loaded")
 
 
-# --- Draft helpers ---
 
-def _new_draft():
+def new_draft():
     return {"text": None, "timestamp": 0.0, "generating": False, "task": None}
 
 
-def _release_draft(d):
+def release_draft(d):
     if d["text"] is None:
         return None
     if time.time() - d["timestamp"] > config.DRAFT_STALE_SEC:
@@ -70,21 +66,21 @@ def _release_draft(d):
     return None if text == "SILENT" else text
 
 
-async def _start_draft(d, transcript, mem_text, state_text, cross_text):
+async def start_draft(d, transcript, mem_text, state_text, cross_text):
     if d["generating"]:
         return
 
-    async def _gen():
+    async def gen():
         d["generating"] = True
         d["text"] = await asyncio.to_thread(
             decide.draft, transcript, mem_text, state_text, cross_text)
         d["timestamp"] = time.time()
         d["generating"] = False
 
-    d["task"] = asyncio.create_task(_gen())
+    d["task"] = asyncio.create_task(gen())
 
 
-def _check_wake(transcript):
+def check_wake(transcript):
     if not transcript:
         return False
     words = []
@@ -96,7 +92,7 @@ def _check_wake(transcript):
     return any(p in tail for p in config.WAKE_PHRASES)
 
 
-def _fetch_cross_meeting(transcript, kg):
+def fetch_cross(transcript, kg):
     if not config.SUPERMEMORY_ENABLED:
         return ""
     labels = [n["label"] for n in sorted(
@@ -110,7 +106,6 @@ def _fetch_cross_meeting(transcript, kg):
     return graph_persist.render_cross_meeting(facts)
 
 
-# --- Main handler ---
 
 async def handle_client(websocket):
     audio_buf = np.zeros(0, dtype=np.float32)
@@ -124,7 +119,7 @@ async def handle_client(websocket):
     last_text_frame = 0
 
     last_probs = [0.0, 0.0, 0.0, 0.0]
-    draft_st = _new_draft()
+    draft_st = new_draft()
     last_gate_time = 0.0
     mem_text = ""
     state_text = ""
@@ -142,19 +137,12 @@ async def handle_client(websocket):
 
     try:
         async for message in websocket:
-            try:
-                msg = json.loads(message)
-            except json.JSONDecodeError as e:
-                log.error(f"Failed to decode message: {e}")
-                continue
+            msg = json.loads(message)
 
             if msg.get("type") == "log_subscribe":
                 since = msg.get("since", 0)
                 recent = [e for e in log_buffer if e["ts"] > since]
-                try:
-                    await websocket.send(json.dumps({"server_log": recent}))
-                except ConnectionClosed:
-                    break
+                await websocket.send(json.dumps({"server_log": recent}))
                 continue
 
             if msg["type"] == "stop":
@@ -178,7 +166,6 @@ async def handle_client(websocket):
             if frame_count % 100 == 0:
                 slog(f"Frame {frame_count}, buf={len(audio_buf)/config.SAMPLE_RATE:.1f}s")
 
-            # --- Streaming Sortformer ---
             if vox_stream:
                 await voxtral.feed_audio(vox_stream, chunk)
             probs_frames = sortformer.push_audio(models["sortformer"], chunk)
@@ -189,14 +176,12 @@ async def handle_client(websocket):
 
             current_probs = last_probs
 
-            # --- VAP ---
             frame_start = max(0, len(audio_buf) - FRAME_SAMPLES)
             frame_audio = audio_buf[frame_start:frame_start + FRAME_SAMPLES]
             if len(frame_audio) < FRAME_SAMPLES:
                 frame_audio = np.pad(frame_audio, (0, FRAME_SAMPLES - len(frame_audio)))
             vap.push_frame(models["vap"], frame_audio)
 
-            # --- State ---
             dyad_out = dyad.detect(current_probs, ts)
             transition = dyad.classify_transition(prev_dyad, dyad_out)
             if transition and transition["type"] == "dyad_shift" and transition.get("from_pair"):
@@ -208,7 +193,6 @@ async def handle_client(websocket):
                 if v["is_active"]:
                     participants.add(k)
 
-            # --- VAP tick (every 4 frames) ---
             if frame_count % VAP_INTERVAL == 0 and frame_count > 0:
                 vap_out = vap.get_latest(models["vap"], "ai_buffer")
                 state.update_vap(meeting, vap_out)
@@ -230,7 +214,6 @@ async def handle_client(websocket):
                     "silence_gap_sec": silence_sec,
                 }
                 
-                # Expose live draft and generation state to the frontend
                 results["live_draft"] = {
                     "text": draft_st["text"],
                     "generating": draft_st["generating"]
@@ -238,16 +221,14 @@ async def handle_client(websocket):
                 
                 state_text = state.render_for_llm(meeting)
 
-                # Pre-warm Mercury 2 draft
                 if (vap_out["ai_opening"] >= config.PREWARM_THRESHOLD
                         and not draft_st["generating"] and draft_st["text"] is None):
                     log.info(f"Pre-warming Mercury draft (VAP opening {vap_out['ai_opening']} >= {config.PREWARM_THRESHOLD})")
-                    await _start_draft(draft_st, transcript_accum, mem_text, state_text, cross_text)
+                    await start_draft(draft_st, transcript_accum, mem_text, state_text, cross_text)
 
-                # Wake word path
-                if _check_wake(transcript_accum):
+                if check_wake(transcript_accum):
                     log.info("Wake word detected!")
-                    draft_text = _release_draft(draft_st)
+                    draft_text = release_draft(draft_st)
                     if draft_text:
                         log.info(f"Using pre-warmed draft for wake word: {draft_text}")
                         results["wake_response"] = {"text": draft_text, "source": "draft", "timestamp": ts}
@@ -256,8 +237,12 @@ async def handle_client(websocket):
                         resp = await asyncio.to_thread(
                             decide.respond_direct, transcript_accum, mem_text, state_text, cross_text)
                         results["wake_response"] = {"text": resp, "source": "direct", "timestamp": ts}
+                    wake_text = results.get("wake_response", {}).get("text")
+                    if wake_text and config.TTS_ENABLED and tts.is_available():
+                        audio_bytes = await asyncio.to_thread(tts.synthesize, wake_text)
+                        if audio_bytes:
+                            results["wake_response"]["tts_audio"] = base64.b64encode(audio_bytes).decode()
 
-                # Gate path (simplified)
                 elif gate.should_open(vap_out["ai_opening"], dyad_out["mode"],
                                       dom_prob, silence_sec, vap_out["turn_hold"]):
                     now = time.time()
@@ -268,9 +253,9 @@ async def handle_client(websocket):
                         if draft_st["generating"] and draft_st["task"]:
                             log.info("Gate opened but draft is still generating. Awaiting HTTP response...")
                             await draft_st["task"]
-                            draft_text = _release_draft(draft_st)
+                            draft_text = release_draft(draft_st)
                         else:
-                            draft_text = _release_draft(draft_st)
+                            draft_text = release_draft(draft_st)
                             if not draft_text:
                                 log.info("No pre-warmed draft available. Fetching JIT response from Mercury...")
                                 draft_text = await asyncio.to_thread(
@@ -280,7 +265,7 @@ async def handle_client(websocket):
 
                         log.info(f"Gate response: {draft_text or 'SILENT / stale'}")
                         if draft_text:
-                            results["gate_open"] = {
+                            gate_payload = {
                                 "timestamp": ts,
                                 "ai_opening": vap_out["ai_opening"],
                                 "mode": dyad_out["mode"],
@@ -288,10 +273,14 @@ async def handle_client(websocket):
                                 "decision": draft_text,
                                 "source": "draft",
                             }
+                            if config.TTS_ENABLED and tts.is_available():
+                                audio_bytes = await asyncio.to_thread(tts.synthesize, draft_text)
+                                if audio_bytes:
+                                    gate_payload["tts_audio"] = base64.b64encode(audio_bytes).decode()
+                            results["gate_open"] = gate_payload
                     else:
                         log.debug("Gate signal fired but in cooldown.")
 
-            # --- GLiNER + graph (every ~10s) ---
             if frame_count % GLINER_INTERVAL == 0 and transcript_accum:
                 combined = " ".join(t.get("text", "") for t in transcript_accum[-20:])
                 if len(combined.split()) >= GLINER_MIN_WORDS:
@@ -304,7 +293,7 @@ async def handle_client(websocket):
 
                         if config.SUPERMEMORY_ENABLED:
                             await asyncio.to_thread(graph_persist.persist_graph, kg, list(participants))
-                            cross_text = await asyncio.to_thread(_fetch_cross_meeting, transcript_accum, kg)
+                            cross_text = await asyncio.to_thread(fetch_cross, transcript_accum, kg)
 
                         mem_text = memory.render_for_llm(mem_store)
                         results["memory"] = mem_text
@@ -312,7 +301,6 @@ async def handle_client(websocket):
 
             prev_dyad = dyad_out
 
-            # --- Voxtral transcript accumulation ---
             new_text = voxtral.get_text(vox_stream)
             if new_text:
                 dom = dyad_out["dominant"] if dyad_out else None
@@ -341,11 +329,7 @@ async def handle_client(websocket):
                 results.setdefault("transcript", []).append(dict(cur_seg))
                 cur_seg = {"text": "", "start": 0.0, "end": 0.0, "slot_id": -1, "speaker": "unknown"}
 
-            try:
-                await websocket.send(json.dumps(results, default=_serialize))
-            except ConnectionClosed:
-                slog("Client disconnected")
-                break
+            await websocket.send(json.dumps(results, default=serialize))
 
     finally:
         await voxtral.stop_stream(vox_stream)
@@ -357,7 +341,7 @@ async def handle_client(websocket):
         slog(f"Meeting ended: {kg['meeting_id']}")
 
 
-def _serialize(obj):
+def serialize(obj):
     if isinstance(obj, np.floating):
         return float(obj)
     if isinstance(obj, np.integer):

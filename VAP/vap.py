@@ -35,11 +35,11 @@ def get_latest(model, source_label):
         except queue.Empty:
             break
     if last is None:
-        return _empty_output(source_label)
-    return _format_result(last, source_label)
+        return empty_output(source_label)
+    return format_result(last, source_label)
 
 
-def _format_result(result, source_label):
+def format_result(result, source_label):
     p_now_0 = float(result["p_now"][0])
     p_now_1 = float(result["p_now"][1])
     p_fut_0 = float(result["p_future"][0])
@@ -57,7 +57,7 @@ def _format_result(result, source_label):
     }
 
 
-def _empty_output(source_label):
+def empty_output(source_label):
     is_ai = "ai" in source_label.lower()
     return {
         "source": source_label,

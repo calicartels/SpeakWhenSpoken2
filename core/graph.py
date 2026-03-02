@@ -5,7 +5,7 @@ import logging
 log = logging.getLogger("graph")
 
 
-_RELATIONAL_LABELS = {
+RELATIONAL_LABELS = {
     "person owns deadline": ("person", "owns", "deadline"),
     "decision about topic": ("decision", "about", "topic"),
     "commitment by person": ("commitment", "by", "person"),
@@ -23,12 +23,12 @@ def new_graph(meeting_id=None):
     }
 
 
-def _node_id(label, node_type):
+def node_id(label, node_type):
     return f"{node_type}:{label.lower().strip()}"
 
 
 def add_entity(graph, label, node_type, timestamp):
-    nid = _node_id(label, node_type)
+    nid = node_id(label, node_type)
     if nid in graph["nodes"]:
         graph["nodes"][nid]["mentions"] += 1
         graph["nodes"][nid]["last_seen"] = timestamp
@@ -55,8 +55,8 @@ def add_relation(graph, src_label, src_type, tgt_label, tgt_type, relation, ts):
     log.info(f"New Edge: {src_label} --{relation}--> {tgt_label}")
 
 
-def _add_relational(graph, label, text, ts):
-    src_type, rel, tgt_type = _RELATIONAL_LABELS[label]
+def add_relational_edge(graph, label, text, ts):
+    src_type, rel, tgt_type = RELATIONAL_LABELS[label]
     parts = text.split()
     split_idx = None
     for i, w in enumerate(parts):
@@ -77,8 +77,8 @@ def ingest_gliner(graph, entities, ts):
     log.debug(f"Ingesting {len(entities)} GLiNER entities")
     simple = []
     for ent in entities:
-        if ent["label"].lower() in _RELATIONAL_LABELS:
-            _add_relational(graph, ent["label"].lower(), ent["text"], ts)
+        if ent["label"].lower() in RELATIONAL_LABELS:
+            add_relational_edge(graph, ent["label"].lower(), ent["text"], ts)
         else:
             add_entity(graph, ent["text"], ent["label"], ts)
             simple.append(ent)

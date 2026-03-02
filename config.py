@@ -6,7 +6,6 @@ CHANNELS = 1
 WS_HOST = "0.0.0.0"
 WS_PORT = 8765
 
-# Sortformer streaming v2
 SORTFORMER_MODEL = "nvidia/diar_streaming_sortformer_4spk-v2"
 SORTFORMER_CHUNK_LEN = 6
 SORTFORMER_RIGHT_CONTEXT = 7
@@ -14,11 +13,9 @@ SORTFORMER_FIFO_LEN = 188
 SORTFORMER_CACHE_UPDATE = 144
 SORTFORMER_CACHE_LEN = 188
 
-# Voxtral via vLLM
 VOXTRAL_MODEL = "mistralai/Voxtral-Mini-4B-Realtime-2602"
 VLLM_PORT = 8000
 
-# GLiNER (multitask-large for NER + relational extraction)
 GLINER_MODEL = "knowledgator/gliner-multitask-large-v0.5"
 ENTITY_LABELS = [
     "person", "organization", "product", "date", "decision",
@@ -28,37 +25,34 @@ ENTITY_LABELS = [
 ]
 ENTITY_THRESHOLD = 0.4
 
-# Gate (simplified: VAP + silence)
-GATE_THRESHOLD = 0.70          # VAP opening score to consider speaking
-GATE_SILENCE_MIN = 1.5         # minimum silence gap (sec) before gate can open
-GATE_SILENCE_FORCE = 3.0       # force gate open after this much silence
-GATE_SUPPRESS_SEC = 3.0        # suppress duplicate gates within this window
-GATE_COOLDOWN_SEC = 5.0        # minimum seconds between gate openings
+GATE_THRESHOLD = 0.70
+GATE_SILENCE_MIN = 1.5
+GATE_SILENCE_FORCE = 3.0
+GATE_SUPPRESS_SEC = 3.0
+GATE_COOLDOWN_SEC = 5.0
 
-# Mercury 2 (Inception Labs diffusion LLM)
 MERCURY_API_URL = "https://api.inceptionlabs.ai/v1/chat/completions"
 MERCURY_MODEL = "mercury-2"
 
-# Drafter (VAP-triggered pre-warm)
 PREWARM_THRESHOLD = 0.4
 DRAFT_STALE_SEC = 10.0
 
-# Wake word
 WAKE_PHRASES = ["hey fauna", "fauna", "assistant", "hey assistant"]
 WAKE_WORD_WINDOW = 5
 
-# Supermemory (cross-meeting persistence)
 SUPERMEMORY_ENABLED = True
 CROSS_MEETING_SEARCH_LIMIT = 8
 
-# Segment parameters
+TTS_ENABLED = True
+TTS_VOICE = "Rachel"
+TTS_MODEL = "eleven_turbo_v2_5"
+
 SEGMENT_ACTIVE_THRESHOLD = 0.3
 SEGMENT_MERGE_GAP_FRAMES = 5
 SEGMENT_MIN_SEC = 0.5
 MIN_SEGMENT_SEC = 1.5
 MAX_SEGMENT_SEC = 10.0
 
-# Identity (kept for address book)
 ECAPA_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 ECAPA_EMB_DIM = 192
 IDENTITY_MIN_SEC = 2.0
@@ -66,13 +60,11 @@ IDENTITY_THRESHOLD = 0.55
 ADDRESS_BOOK_PATH = "state/address_book.pt"
 FIFTH_SPEAKER_THRESHOLD = 0.40
 
-# Offline eval helpers
 PROBS_CACHE_PATH = "assets/sortformer_probs.npy"
 TRANSCRIPT_CACHE_PATH = "assets/transcript_cache.json"
 HIGH_OPENING_THRESHOLD = 0.75
 TRANSCRIPT_WINDOW_SEC = 5.0
 
-# Legacy LLM (kept for offline eval)
 DECISION_MODEL = "anthropic/claude-haiku-4.5"
 DECISION_USE_NITRO = False
 DECISION_MAX_TOKENS = 200
