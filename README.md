@@ -2,15 +2,17 @@
 
 Can you put an AI voice agent into a 4-person meeting and have it actually work?
 
+<video src="https://github.com/calicartels/SpeakWhenSpoken2/blob/main/assets/video.mp4" controls width="100%"></video>
+
 Inspired by [Ishiki Labs'](https://twitter.com/ishikilabs) Fern (YC W26) — except this one focuses on group conversations. Not 1-on-1 voice assistants (those are solved). Group settings are fundamentally harder: overlapping speakers, fragmented context, backchannels misread as turn endings, and silence that belongs to someone thinking rather than open floor.
 
 Built on Voice Activity Projection, Streaming Sortformer diarization, and Mercury 2 (1000+ tok/sec diffusion LLM). Runs on a single rented 3090 for under $10 in compute.
 
 [Full writeup →](https://x.com/vishnutm244412/status/2028279537717432717)
 
-![Architecture](assets/image.png)
+![Architecture](https://github.com/calicartels/SpeakWhenSpoken2/blob/main/assets/image.png)
 
-<video src="SpeakWhenSpoken2/assets/video.mp4" controls width="100%"></video>
+
 
 ---
 
